@@ -1,15 +1,15 @@
-"""Check if daemon is running, start it if not.
+"""Check if daemon is running via scheduled task. Start if not.
 
-Called by CC SessionStart hook. Idempotent - safe to call multiple times.
+Called by CC SessionStart hook. Idempotent.
 """
 
 import os
 import sys
 import subprocess
-import time
+import ctypes
 
-DAEMON_SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "daemon.py")
 PID_FILE = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Temp", "cc_traffic_light_daemon.pid")
+TASK_NAME = "ClaudeTrafficLightDaemon"
 
 
 def is_daemon_running() -> bool:
@@ -18,36 +18,19 @@ def is_daemon_running() -> bool:
     try:
         with open(PID_FILE, "r") as f:
             pid = int(f.read().strip())
-        # Check if process exists
-        os.kill(pid, 0)
-        return True
+        kernel32 = ctypes.windll.kernel32
+        handle = kernel32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+        if handle:
+            kernel32.CloseHandle(handle)
+            return True
+        return False
     except (OSError, ValueError):
-        # Process not found or invalid PID
-        try:
-            os.remove(PID_FILE)
-        except OSError:
-            pass
         return False
 
 
-def start_daemon() -> bool:
-    try:
-        proc = subprocess.Popen(
-            [sys.executable, DAEMON_SCRIPT],
-            creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NO_WINDOW,
-            stdout=open(os.path.join(os.environ.get("LOCALAPPDATA", ""), "Temp", "cc_traffic_light_daemon.log"), "w"),
-            stderr=subprocess.STDOUT,
-        )
-        with open(PID_FILE, "w") as f:
-            f.write(str(proc.pid))
-        # Wait briefly to check if it starts successfully
-        time.sleep(0.5)
-        if proc.poll() is not None:
-            return False
-        return True
-    except Exception as e:
-        print(f"Failed to start daemon: {e}", file=sys.stderr)
-        return False
+def start_via_task():
+    """Start the scheduled task."""
+    subprocess.run(["schtasks", "/Run", "/TN", TASK_NAME], capture_output=True)
 
 
 def main():
@@ -55,10 +38,15 @@ def main():
         print("Daemon already running.")
         return
 
-    if start_daemon():
-        print("Daemon started.")
+    # Try to start via scheduled task
+    start_via_task()
+    import time
+    time.sleep(1)
+
+    if is_daemon_running():
+        print("Daemon started via scheduled task.")
     else:
-        print("Failed to start daemon.", file=sys.stderr)
+        print("Daemon not running. Run 'python install_service.py' as admin first.", file=sys.stderr)
         sys.exit(1)
 
 
