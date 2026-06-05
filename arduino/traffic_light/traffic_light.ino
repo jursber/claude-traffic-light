@@ -3,10 +3,9 @@
  * ESP32C3 - receives single-char commands via USB Serial
  *
  * Commands:
- *   G = green blink    (calling model - API request)
- *   g = green solid    (working - writing code etc.)
+ *   G = green blink    (calling model - waiting for API response)
+ *   g = green solid    (working - writing code / running tools)
  *   y = yellow blink   (thinking)
- *   Y = yellow solid   (calling tools)
  *   r = red blink      (needs permission OR error)
  *   R = red solid      (finished reply, waiting for input)
  *   O = all off        (session ended)
@@ -28,8 +27,8 @@ unsigned long lastBlink = 0;
 bool blinkState = false;
 const int BLINK_INTERVAL = 500;
 
-// 0=off, 1=green blink, 2=green solid, 3=yellow blink, 4=yellow solid,
-// 5=red blink, 6=red solid
+// 0=off, 1=green blink, 2=green solid, 3=yellow blink,
+// 4=red blink, 5=red solid
 int mode = 0;
 
 void setAll(bool g, bool y, bool r) {
@@ -53,9 +52,8 @@ void loop() {
             case 'G': mode = 1; break;  // green blink
             case 'g': mode = 2; break;  // green solid
             case 'y': mode = 3; break;  // yellow blink
-            case 'Y': mode = 4; break;  // yellow solid
-            case 'r': mode = 5; break;  // red blink
-            case 'R': mode = 6; break;  // red solid
+            case 'r': mode = 4; break;  // red blink
+            case 'R': mode = 5; break;  // red solid
             case 'O': mode = 0; break;  // off
         }
     }
@@ -81,17 +79,14 @@ void loop() {
                 setAll(false, blinkState, false);
             }
             break;
-        case 4: // yellow solid
-            setAll(false, true, false);
-            break;
-        case 5: // red blink
+        case 4: // red blink
             if (millis() - lastBlink >= BLINK_INTERVAL) {
                 lastBlink = millis();
                 blinkState = !blinkState;
                 setAll(false, false, blinkState);
             }
             break;
-        case 6: // red solid
+        case 5: // red solid
             setAll(false, false, true);
             break;
     }

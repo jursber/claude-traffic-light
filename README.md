@@ -7,25 +7,28 @@
 | 状态 | 灯光 | 含义 | 优先级 |
 |------|------|------|--------|
 | alert | 🔴 红灯闪烁 | 需要用户授权 / API 或工具出错 | 1 (最高) |
-| tools | 🟡 黄灯常亮 | 正在调用工具 | 2 |
-| model | 🟢 绿灯闪烁 | 正在调用模型 (API 请求) | 3 |
+| working | 🟢 绿灯常亮 | 拿到回复，正在写代码/执行操作 | 2 |
+| model | 🟢 绿灯闪烁 | 调用模型中，等待 API 响应 | 3 |
 | thinking | 🟡 黄灯闪烁 | 思考中 | 4 |
-| working | 🟢 绿灯常亮 | 工作中 (写代码等) | 5 |
-| idle | 🔴 红灯常亮 | CC 完成回复，等待输入 | 6 |
-| off | ⚫ 全灭 | 会话结束 | 7 (最低) |
+| idle | 🔴 红灯常亮 | CC 完成回复，等待输入 | 5 |
+| off | ⚫ 全灭 | 会话结束 | 6 (最低) |
+
+### 状态流转
+
+```
+用户发消息 → thinking(黄闪) → model(绿闪) → working(绿亮) → model(绿闪) → ... → idle(红亮)
+```
 
 ### 多终端优先级
 
 多个 CC 终端同时运行时，灯显示**优先级最高**的状态。
-
-例如：终端 A 在思考（黄闪，优先级 4），终端 B 需要授权（红闪，优先级 1）→ 红灯闪烁。
 
 ## 硬件
 
 - ESP32C3 开发板
 - 三色 LED 模块（绿/黄/红）
 - 接线：GPIO0=绿，GPIO1=黄，GPIO2=红（有源低电平）
-- 串口自动检测（通过 Espressif USB VID 0x303A），无需手动配置 COM 口
+- 串口自动检测（通过 Espressif USB VID 0x303A）
 
 ## 软件架构
 
@@ -41,10 +44,11 @@ CC Hook 触发 → set_state.py 写状态文件(带 session_id)
 
 | 文件 | 作用 |
 |------|------|
-| `config.py` | 配置（自动检测串口、波特率、状态定义、优先级） |
-| `daemon.py` | 串口守护进程，聚合多会话状态 |
-| `set_state.py` | Hook 调用入口，写 session 状态文件 |
+| `config.py` | 自动检测串口 + 状态/优先级配置 |
+| `daemon.py` | 串口守护进程，多会话聚合 |
+| `set_state.py` | Hook 调用入口，读 session_id 写状态文件 |
 | `start_daemon.py` | 自动启动守护进程（幂等） |
+| `install_service.py` | 注册 Windows 计划任务（无窗口后台运行） |
 | `test_all.py` | 全量测试脚本 |
 | `arduino/traffic_light.ino` | ESP32C3 固件 |
 
@@ -54,7 +58,8 @@ CC Hook 触发 → set_state.py 写状态文件(带 session_id)
 2. 烧录 `arduino/traffic_light.ino` 到 ESP32C3
 3. Arduino IDE 中启用 **Tools → USB CDC On Boot → Enabled**
 4. 关闭 Arduino IDE 串口监视器
-5. 运行 `python test_all.py` 验证
+5. 以管理员运行 `python install_service.py`（注册计划任务）
+6. 运行 `python test_all.py` 验证
 
 Hooks 已配置在 `~/.claude/settings.json`，启动 CC 后自动生效。
 

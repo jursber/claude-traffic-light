@@ -6,7 +6,6 @@ Usage: python test_all.py
 
 import os
 import time
-import sys
 
 from config import COMMANDS, STATE_DIR
 
@@ -18,10 +17,9 @@ def write_state(state, session="test"):
         f.write(state)
     os.replace(tmp, path)
 
-def clean_session(session="test"):
-    path = os.path.join(STATE_DIR, session)
+def clean_session(session):
     try:
-        os.remove(path)
+        os.remove(os.path.join(STATE_DIR, session))
     except OSError:
         pass
 
@@ -34,17 +32,14 @@ def test(name, state, duration=2):
 def main():
     print("Traffic Light Test Suite")
     print("=" * 50)
-    print(f"State dir: {STATE_DIR}")
-    print(f"Make sure daemon.py is running!\n")
 
     tests = [
-        ("Green blink",    "model"),      # calling model
-        ("Green solid",    "working"),    # working
-        ("Yellow blink",   "thinking"),   # thinking
-        ("Yellow solid",   "tools"),      # calling tools
-        ("Red blink",      "alert"),      # permission / error
-        ("Red solid",      "idle"),       # waiting for input
-        ("All off",        "off"),        # session ended
+        ("Green blink",    "model"),
+        ("Green solid",    "working"),
+        ("Yellow blink",   "thinking"),
+        ("Red blink",      "alert"),
+        ("Red solid",      "idle"),
+        ("All off",        "off"),
     ]
 
     for name, state in tests:
@@ -52,19 +47,17 @@ def main():
 
     # Multi-session priority test
     print("\n  Multi-session priority test ... ", end="", flush=True)
-    write_state("idle", "session_a")      # priority 6
-    write_state("alert", "session_b")     # priority 1 (highest)
+    write_state("idle", "session_a")      # priority 5
+    write_state("alert", "session_b")     # priority 1
     time.sleep(1)
-    # Should show red blink (alert) because it has highest priority
     clean_session("session_a")
     clean_session("session_b")
     time.sleep(0.5)
     print("OK (should have shown red blink)")
 
-    # Rapid switching test
     print("  Rapid switch test ... ", end="", flush=True)
     for _ in range(3):
-        for state in ["idle", "thinking", "tools", "alert", "off"]:
+        for state in ["idle", "thinking", "working", "alert", "off"]:
             write_state(state)
             time.sleep(0.15)
     print("OK")

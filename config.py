@@ -21,10 +21,9 @@ STATE_DIR = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Temp", "cc_tl_stat
 
 # Serial commands sent to ESP32C3
 COMMANDS = {
-    "model":       "G",   # green blink   - calling model (API request)
-    "working":     "g",   # green solid   - working (writing code etc.)
+    "model":       "G",   # green blink   - calling model, waiting for response
+    "working":     "g",   # green solid   - got response, writing code / running tools
     "thinking":    "y",   # yellow blink  - thinking
-    "tools":       "Y",   # yellow solid  - calling tools
     "alert":       "r",   # red blink     - needs permission OR error
     "idle":        "R",   # red solid     - finished reply, waiting for input
     "off":         "O",   # all off       - session ended
@@ -33,10 +32,9 @@ COMMANDS = {
 # Priority: lower number = higher priority (shown first)
 PRIORITY = {
     "alert":    1,
-    "tools":    2,
-    "working":  3,
-    "model":    4,
-    "thinking": 5,
-    "idle":     6,
-    "off":      7,
+    "working":  2,
+    "model":    3,
+    "thinking": 4,
+    "idle":     5,
+    "off":      6,
 }
