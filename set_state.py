@@ -40,16 +40,20 @@ def main():
     state = sys.argv[1]
 
     # Read stdin JSON
-    session_id = "default"
+    session_id = ""
     tool_name = ""
     try:
         raw = sys.stdin.read().strip()
         if raw:
             data = json.loads(raw)
-            session_id = data.get("session_id", "default")
+            session_id = data.get("session_id", "")
             tool_name = data.get("tool_name", "")
     except (json.JSONDecodeError, EOFError, OSError):
         pass
+
+    # Skip if no session_id (hook didn't provide it)
+    if not session_id:
+        sys.exit(0)
 
     # Auto mode: decide state based on tool_name
     if state == "auto":
