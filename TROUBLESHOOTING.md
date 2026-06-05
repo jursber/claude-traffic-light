@@ -86,3 +86,27 @@ ser.rts = False
 **原因**：用 `run_in_background` 启动的后台任务会在会话结束时被清理。即使用 `DETACHED_PROCESS` 标志也不生效。
 
 **解决**：用 Windows 任务计划程序（`schtasks`）注册守护进程为登录自启任务，完全独立于 CC。通过 `install_service.py` 安装。
+
+## 11. S4U 计划任务无法访问 COM 端口
+
+**现象**：计划任务用 `S4U` LogonType 时，守护进程启动后立即崩溃，报 COM 端口权限错误。
+
+**原因**：S4U 登录类型在非交互式会话中运行，无法访问 COM 端口。
+
+**解决**：改用 `InteractiveToken` + `<Hidden>true</Hidden>`，既能在交互式会话中访问 COM 端口，又不显示窗口。但这种方式下，关闭同会话的其他 Python 进程可能连带杀死守护进程。
+
+## 12. 守护进程被其他 Python 进程关闭时连带杀死
+
+**现象**：关闭某个 Python 窗口后，守护进程也跟着死了。
+
+**原因**：Windows 会话管理可能在特定条件下清理同会话的进程。
+
+**解决**：改用启动文件夹（`Startup`）+ VBScript 守护脚本（`daemon_guard.vbs`）。守护脚本循环监控守护进程，崩溃后 3 秒自动重启。比计划任务更可靠。
+
+## 13. AskUserQuestion 显示绿灯而非红灯
+
+**现象**：CC 通过 AskUserQuestion 弹出选择框时，灯显示绿灯常亮（working），而不是红灯闪烁（alert）。
+
+**原因**：AskUserQuestion 也是工具调用，触发 PreToolUse hook 设置 "working" 状态。CC 没有专门的 hook 区分"正在执行工具"和"正在等用户回答"。
+
+**解决**：PreToolUse hook 改用 `auto` 模式，脚本根据 `tool_name` 自动判断：AskUserQuestion → alert，其他工具 → working。
