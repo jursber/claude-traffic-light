@@ -25,9 +25,9 @@ COMMANDS = {
 PRIORITY = {
     "alert":    1,   # permission / error - needs immediate attention
     "tools":    2,   # calling tools
-    "model":    3,   # calling model
-    "thinking": 4,   # thinking
-    "working":  5,   # working
+    "working":  3,   # model returned, processing results
+    "model":    4,   # calling model (API request)
+    "thinking": 5,   # thinking
     "idle":     6,   # waiting for input
     "off":      7,   # session ended
 }

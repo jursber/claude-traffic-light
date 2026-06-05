@@ -37,12 +37,13 @@ def main():
 
     # Read session_id from stdin JSON
     session_id = "default"
-    if not sys.stdin.isatty():
-        try:
-            data = json.load(sys.stdin)
+    try:
+        raw = sys.stdin.read().strip()
+        if raw:
+            data = json.loads(raw)
             session_id = data.get("session_id", "default")
-        except (json.JSONDecodeError, EOFError):
-            pass
+    except (json.JSONDecodeError, EOFError, OSError):
+        pass
 
     sys.exit(0 if set_state(state, session_id) else 1)
 
