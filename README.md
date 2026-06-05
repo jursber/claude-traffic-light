@@ -1,17 +1,24 @@
 # Claude Code Traffic Light
 
-用硬件红绿灯实时显示 Claude Code 的工作状态。
+用硬件红绿灯实时显示 Claude Code 的工作状态。支持多终端并行，优先级显示。
 
 ## 灯光状态
 
-| 状态 | 灯光 | 含义 |
-|------|------|------|
-| idle | 🟢 绿灯常亮 | CC 完成回复，等待输入 |
-| thinking | 🟡 黄灯闪烁 | CC 正在调用模型 |
-| executing | 🟡 黄灯常亮 | CC 正在执行工具 |
-| permission | 🔴 红灯闪烁 | 需要用户授权 |
-| error | 🔴 红灯常亮 | API 或工具出错 |
-| off | ⚫ 全灭 | 会话结束 |
+| 状态 | 灯光 | 含义 | 优先级 |
+|------|------|------|--------|
+| alert | 🔴 红灯闪烁 | 需要用户授权 / API 或工具出错 | 1 (最高) |
+| tools | 🟡 黄灯常亮 | 正在调用工具 | 2 |
+| model | 🟢 绿灯闪烁 | 正在调用模型 (API 请求) | 3 |
+| thinking | 🟡 黄灯闪烁 | 思考中 | 4 |
+| working | 🟢 绿灯常亮 | 工作中 (写代码等) | 5 |
+| idle | 🔴 红灯常亮 | CC 完成回复，等待输入 | 6 |
+| off | ⚫ 全灭 | 会话结束 | 7 (最低) |
+
+### 多终端优先级
+
+多个 CC 终端同时运行时，灯显示**优先级最高**的状态。
+
+例如：终端 A 在思考（黄闪，优先级 4），终端 B 需要授权（红闪，优先级 1）→ 红灯闪烁。
 
 ## 硬件
 
@@ -22,16 +29,20 @@
 ## 软件架构
 
 ```
-CC Hook 触发 → set_state.py 写状态文件 → daemon.py 读取 → 串口发送 → ESP32C3 点灯
+CC Hook 触发 → set_state.py 写状态文件(带 session_id)
+                     ↓
+              daemon.py 读取所有 session 文件
+                     ↓
+              取最高优先级 → 串口发送 → ESP32C3 点灯
 ```
 
 ### 文件说明
 
 | 文件 | 作用 |
 |------|------|
-| `config.py` | 配置（COM口、波特率、状态定义） |
-| `daemon.py` | 串口守护进程，常驻后台 |
-| `set_state.py` | Hook 调用入口，写状态文件 |
+| `config.py` | 配置（COM口、波特率、状态定义、优先级） |
+| `daemon.py` | 串口守护进程，聚合多会话状态 |
+| `set_state.py` | Hook 调用入口，写 session 状态文件 |
 | `start_daemon.py` | 自动启动守护进程（幂等） |
 | `test_all.py` | 全量测试脚本 |
 | `arduino/traffic_light.ino` | ESP32C3 固件 |
@@ -53,7 +64,11 @@ Hooks 已配置在 `~/.claude/settings.json`，启动 CC 后自动生效。
 python daemon.py
 
 # 手动切换状态
-python set_state.py idle
+echo '{"session_id":"test"}' | python set_state.py idle
 python set_state.py thinking
-python set_state.py error
+python set_state.py alert
 ```
+
+## 踩坑记录
+
+见 [TROUBLESHOOTING.md](TROUBLESHOOTING.md)

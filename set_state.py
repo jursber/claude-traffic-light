@@ -1,26 +1,51 @@
-"""Called by hooks. Just writes state to file - daemon handles serial.
+"""Called by hooks. Writes session-specific state file.
 
-Usage: python set_state.py <state>
+Reads session_id from stdin JSON (provided by CC hooks).
+Each session gets its own file in STATE_DIR.
+
+Usage: echo '{"session_id":"abc123"}' | python set_state.py <state>
 """
 
 import sys
 import os
+import json
 
-from config import COMMANDS, STATE_FILE
+from config import COMMANDS, STATE_DIR
 
-def set_state(state: str) -> bool:
+
+def set_state(state: str, session_id: str = "default") -> bool:
     if state not in COMMANDS:
         return False
+    os.makedirs(STATE_DIR, exist_ok=True)
+    state_file = os.path.join(STATE_DIR, session_id)
     try:
-        tmp = STATE_FILE + ".tmp"
+        tmp = state_file + ".tmp"
         with open(tmp, "w") as f:
             f.write(state)
-        os.replace(tmp, STATE_FILE)
+        os.replace(tmp, state_file)
         return True
     except OSError:
         return False
 
-if __name__ == "__main__":
+
+def main():
     if len(sys.argv) < 2:
+        print(f"Usage: {sys.argv[0]} <state>", file=sys.stderr)
         sys.exit(1)
-    sys.exit(0 if set_state(sys.argv[1]) else 1)
+
+    state = sys.argv[1]
+
+    # Read session_id from stdin JSON
+    session_id = "default"
+    if not sys.stdin.isatty():
+        try:
+            data = json.load(sys.stdin)
+            session_id = data.get("session_id", "default")
+        except (json.JSONDecodeError, EOFError):
+            pass
+
+    sys.exit(0 if set_state(state, session_id) else 1)
+
+
+if __name__ == "__main__":
+    main()

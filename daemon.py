@@ -1,7 +1,7 @@
 """Traffic light daemon.
 
-Holds serial port open, watches state file for changes.
-Run once in background; hooks just write to the state file.
+Holds serial port open, watches state directory for changes.
+Aggregates all session states and displays the highest priority one.
 
 Usage: python daemon.py
 """
@@ -11,19 +11,44 @@ import time
 import serial
 import sys
 
-from config import SERIAL_PORT, BAUD_RATE, COMMANDS, STATE_FILE
+from config import SERIAL_PORT, BAUD_RATE, COMMANDS, STATE_DIR, PRIORITY
 
 POLL_INTERVAL = 0.05  # 50ms
 PID_FILE = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Temp", "cc_traffic_light_daemon.pid")
+
+
+def read_all_states() -> dict:
+    """Read all session state files, return {session_id: state}."""
+    states = {}
+    if not os.path.exists(STATE_DIR):
+        return states
+    for name in os.listdir(STATE_DIR):
+        if name.endswith(".tmp"):
+            continue
+        path = os.path.join(STATE_DIR, name)
+        try:
+            with open(path, "r") as f:
+                state = f.read().strip()
+            if state in COMMANDS:
+                states[name] = state
+        except OSError:
+            continue
+    return states
+
+
+def highest_priority(states: dict) -> str:
+    """Return the state with the highest priority (lowest number)."""
+    if not states:
+        return "off"
+    return min(states.values(), key=lambda s: PRIORITY.get(s, 99))
+
 
 def main():
     # Write PID file
     with open(PID_FILE, "w") as f:
         f.write(str(os.getpid()))
 
-    if not os.path.exists(STATE_FILE):
-        with open(STATE_FILE, "w") as f:
-            f.write("off")
+    os.makedirs(STATE_DIR, exist_ok=True)
 
     print(f"Opening {SERIAL_PORT}...", flush=True)
     try:
@@ -35,21 +60,17 @@ def main():
         sys.exit(1)
 
     print("Daemon running.", flush=True)
-    last_state = None
+    last_cmd = None
     try:
         while True:
-            try:
-                with open(STATE_FILE, "r") as f:
-                    state = f.read().strip()
-            except FileNotFoundError:
-                break
+            states = read_all_states()
+            best = highest_priority(states)
+            cmd = COMMANDS.get(best, "O")
 
-            if state != last_state:
-                cmd = COMMANDS.get(state)
-                if cmd:
-                    ser.write(cmd.encode("ascii"))
-                    ser.flush()
-                    last_state = state
+            if cmd != last_cmd:
+                ser.write(cmd.encode("ascii"))
+                ser.flush()
+                last_cmd = cmd
 
             time.sleep(POLL_INTERVAL)
     except KeyboardInterrupt:
@@ -65,6 +86,7 @@ def main():
             os.remove(PID_FILE)
         except OSError:
             pass
+
 
 if __name__ == "__main__":
     main()
