@@ -1,6 +1,6 @@
 """Install traffic light daemon as a Windows scheduled task.
 
-Runs at login without a visible window.
+Runs at login, hidden window via pythonw.exe.
 Usage: python install_service.py [--uninstall]
 """
 
@@ -13,6 +13,7 @@ TASK_NAME = "ClaudeTrafficLightDaemon"
 DAEMON_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "daemon.py")
 PYTHONW = sys.executable.replace("python.exe", "pythonw.exe")
 
+# Use InteractiveToken + Hidden to allow COM port access without visible window
 TASK_XML = f"""<?xml version="1.0" encoding="UTF-16"?>
 <Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
   <Settings>
@@ -20,6 +21,7 @@ TASK_XML = f"""<?xml version="1.0" encoding="UTF-16"?>
     <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
     <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
     <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>
+    <Hidden>true</Hidden>
   </Settings>
   <Triggers>
     <LogonTrigger>
@@ -34,7 +36,7 @@ TASK_XML = f"""<?xml version="1.0" encoding="UTF-16"?>
   </Actions>
   <Principals>
     <Principal id="Author">
-      <LogonType>S4U</LogonType>
+      <LogonType>InteractiveToken</LogonType>
       <RunLevel>HighestAvailable</RunLevel>
     </Principal>
   </Principals>
@@ -42,11 +44,9 @@ TASK_XML = f"""<?xml version="1.0" encoding="UTF-16"?>
 
 
 def install():
-    # Delete old task if exists
     subprocess.run(["schtasks", "/Delete", "/F", "/TN", TASK_NAME],
                     capture_output=True)
 
-    # Write XML to temp file
     xml_path = os.path.join(tempfile.gettempdir(), "cc_tl_task.xml")
     with open(xml_path, "w", encoding="utf-16") as f:
         f.write(TASK_XML)
@@ -59,7 +59,7 @@ def install():
 
     if result.returncode == 0:
         subprocess.run(["schtasks", "/Run", "/TN", TASK_NAME], capture_output=True)
-        print(f"Scheduled task '{TASK_NAME}' created (hidden window).")
+        print(f"Scheduled task '{TASK_NAME}' created.")
     else:
         print(f"Failed: {result.stderr}", file=sys.stderr)
         sys.exit(1)
