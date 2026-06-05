@@ -25,6 +25,7 @@
 - ESP32C3 开发板
 - 三色 LED 模块（绿/黄/红）
 - 接线：GPIO0=绿，GPIO1=黄，GPIO2=红（有源低电平）
+- 串口自动检测（通过 Espressif USB VID 0x303A），无需手动配置 COM 口
 
 ## 软件架构
 
@@ -40,7 +41,7 @@ CC Hook 触发 → set_state.py 写状态文件(带 session_id)
 
 | 文件 | 作用 |
 |------|------|
-| `config.py` | 配置（COM口、波特率、状态定义、优先级） |
+| `config.py` | 配置（自动检测串口、波特率、状态定义、优先级） |
 | `daemon.py` | 串口守护进程，聚合多会话状态 |
 | `set_state.py` | Hook 调用入口，写 session 状态文件 |
 | `start_daemon.py` | 自动启动守护进程（幂等） |

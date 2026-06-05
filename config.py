@@ -1,13 +1,22 @@
 """Traffic light configuration."""
 
 import os
+import serial.tools.list_ports
 
-# Serial port settings
-SERIAL_PORT = "COM3"
+# Auto-detect ESP32C3 serial port by USB VID (Espressif)
+ESP32_VID = 0x303A
+DEFAULT_PORT = "COM3"
 BAUD_RATE = 115200
 
+def detect_port() -> str:
+    for port in serial.tools.list_ports.comports():
+        if port.vid == ESP32_VID:
+            return port.device
+    return DEFAULT_PORT
+
+SERIAL_PORT = detect_port()
+
 # State directory for multi-session IPC
-# Each session writes its own file: {STATE_DIR}/{session_id}
 STATE_DIR = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Temp", "cc_tl_states")
 
 # Serial commands sent to ESP32C3
@@ -23,11 +32,11 @@ COMMANDS = {
 
 # Priority: lower number = higher priority (shown first)
 PRIORITY = {
-    "alert":    1,   # permission / error - needs immediate attention
-    "tools":    2,   # calling tools
-    "working":  3,   # model returned, processing results
-    "model":    4,   # calling model (API request)
-    "thinking": 5,   # thinking
-    "idle":     6,   # waiting for input
-    "off":      7,   # session ended
+    "alert":    1,
+    "tools":    2,
+    "working":  3,
+    "model":    4,
+    "thinking": 5,
+    "idle":     6,
+    "off":      7,
 }

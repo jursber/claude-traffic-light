@@ -70,3 +70,19 @@ ser.rts = False
 **原因**：最初设计用单个状态文件，多终端写同一个文件会互相覆盖。
 
 **解决**：改为每个会话独立的状态文件（`{STATE_DIR}/{session_id}`），守护进程读取所有文件，按优先级显示最高优先级状态。
+
+## 9. PowerShell 不传递 stdin
+
+**现象**：hook 用 `shell: "powershell"` 时，`set_state.py` 读不到 session_id，全部写到 `default` 文件。
+
+**原因**：PowerShell 的 `$input` 变量在命令字符串中不工作。CC 通过 stdin 发送的 JSON 无法传递给 Python。
+
+**解决**：hook 改用 `shell: "bash"`（默认），bash 会自动将 stdin 传递给子进程。
+
+## 10. 守护进程被 CC 退出时杀死
+
+**现象**：`/exit` 退出 CC 后，守护进程也跟着死了。
+
+**原因**：用 `run_in_background` 启动的后台任务会在会话结束时被清理。即使用 `DETACHED_PROCESS` 标志也不生效。
+
+**解决**：用 Windows 任务计划程序（`schtasks`）注册守护进程为登录自启任务，完全独立于 CC。通过 `install_service.py` 安装。

@@ -50,7 +50,7 @@ def main():
 
     os.makedirs(STATE_DIR, exist_ok=True)
 
-    print(f"Opening {SERIAL_PORT}...", flush=True)
+    print(f"Opening {SERIAL_PORT} (auto-detected)...", flush=True)
     try:
         ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1, dsrdtr=False)
         ser.dtr = False
