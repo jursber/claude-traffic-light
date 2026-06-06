@@ -17,10 +17,11 @@
 
 import os
 import time
+import json
 import serial
 import sys
 
-from config import SERIAL_PORT, BAUD_RATE, COMMANDS, STATE_DIR, PRIORITY
+from config import SERIAL_PORT, BAUD_RATE, COMMANDS, STATE_DIR, PRIORITY, HEARTBEAT_TIMEOUT, ACTIVE_STATES
 
 # 轮询间隔（秒），50ms 响应足够快，人眼感觉不到延迟
 POLL_INTERVAL = 0.05
@@ -33,8 +34,9 @@ def read_all_states() -> dict:
     """
     读取状态目录下所有 session 的状态文件。
 
-    每个文件名就是 session_id，文件内容就是状态名。
-    跳过 .tmp 后缀的临时文件（那是 set_state.py 正在写入的中间状态）。
+    文件格式：JSON，包含 state（状态名）和 timestamp（时间戳）
+    心跳超时机制：活跃状态（working/thinking/model/alert）如果超过
+    HEARTBEAT_TIMEOUT 秒没有更新，自动降级为 idle。
 
     Returns:
         {session_id: state_name} 的字典
@@ -42,17 +44,35 @@ def read_all_states() -> dict:
     states = {}
     if not os.path.exists(STATE_DIR):
         return states
+    now = time.time()
     for name in os.listdir(STATE_DIR):
         if name.endswith(".tmp"):
             continue  # 跳过临时文件
         path = os.path.join(STATE_DIR, name)
         try:
             with open(path, "r") as f:
-                state = f.read().strip()
-            if state in COMMANDS:
-                states[name] = state
-        except OSError:
-            continue  # 文件可能刚被删除，忽略
+                raw = f.read().strip()
+
+            # 兼容旧格式（纯文本）和新格式（JSON）
+            if raw.startswith("{"):
+                data = json.loads(raw)
+                state = data.get("state", "")
+                ts = data.get("ts", 0)
+            else:
+                state = raw
+                ts = 0  # 旧格式没有时间戳，不超时
+
+            if state not in COMMANDS:
+                continue
+
+            # 心跳超时检测：活跃状态超过 TIMEOUT 秒没更新 → 降级为 idle
+            if state in ACTIVE_STATES and ts > 0:
+                if now - ts > HEARTBEAT_TIMEOUT:
+                    state = "idle"  # 会话可能已崩溃，降级
+
+            states[name] = state
+        except (OSError, json.JSONDecodeError):
+            continue  # 文件可能刚被删除或格式错误，忽略
     return states
 
 

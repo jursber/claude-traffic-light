@@ -18,6 +18,7 @@
 import sys
 import os
 import json
+import time
 
 from config import COMMANDS, STATE_DIR
 
@@ -32,6 +33,10 @@ ALERT_TOOLS = {"AskUserQuestion"}
 def set_state(state: str, session_id: str = "default") -> bool:
     """
     把状态写到指定 session 的状态文件。
+
+    文件格式：JSON，包含 state（状态名）和 timestamp（时间戳）
+    时间戳用于心跳超时检测：如果活跃状态超过 60 秒没更新，
+    守护进程会自动降级为 idle，防止崩溃后灯永远亮着。
 
     使用"写临时文件再重命名"的方式，保证原子性：
     防止守护进程读到写了一半的文件。
@@ -48,9 +53,11 @@ def set_state(state: str, session_id: str = "default") -> bool:
     os.makedirs(STATE_DIR, exist_ok=True)
     state_file = os.path.join(STATE_DIR, session_id)
     try:
+        # 写入 JSON 格式：状态名 + 时间戳
+        data = json.dumps({"state": state, "ts": time.time()})
         tmp = state_file + ".tmp"
         with open(tmp, "w") as f:
-            f.write(state)
+            f.write(data)
         os.replace(tmp, state_file)  # 原子替换，不会读到半写状态
         return True
     except OSError:
