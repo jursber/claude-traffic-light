@@ -110,3 +110,30 @@ ser.rts = False
 **原因**：AskUserQuestion 也是工具调用，触发 PreToolUse hook 设置 "working" 状态。CC 没有专门的 hook 区分"正在执行工具"和"正在等用户回答"。
 
 **解决**：PreToolUse hook 改用 `auto` 模式，脚本根据 `tool_name` 自动判断：AskUserQuestion → alert，其他工具 → working。
+
+## 14. 换 USB 口后灯不亮
+
+**现象**：ESP32C3 换到另一个 USB 口后，灯不亮了。
+
+**原因**：守护进程启动时连接到固定的 COM 口，换 USB 口后 COM 口号变了，守护进程还连着旧端口。
+
+**解决**：守护进程增加断线重连逻辑。串口写入失败时，自动扫描所有 USB 端口，通过 VID（0x303A）找到 ESP32C3 后重新连接。
+
+## 15. 退出 CC 后灯不灭
+
+**现象**：`/exit` 退出所有 CC 窗口后，红灯依然亮着。
+
+**原因**：SessionEnd hook 没有正确触发，或者 hook 没有传递 session_id，导致状态文件没有被更新为 "off"。
+
+**解决**：
+1. `set_state.py` 增加 `_global_off` 机制：当 session_id 为空且状态为 "off" 时，写入 `_global_off` 文件
+2. `daemon.py` 检测到 `_global_off` 文件后，清除所有状态文件并关灯
+3. 心跳超时机制作为兜底：活跃状态超过 60 秒自动降级为 idle
+
+## 16. 守护进程不发 off 命令
+
+**现象**：状态文件全部删除后，守护进程没有发送 off 命令，灯还亮着。
+
+**原因**：守护进程的 `last_cmd` 变量记录了上次发送的指令。如果上次发送的是 off，删除状态文件后不会重复发送。
+
+**解决**：守护进程启动时强制发送一次当前状态，确保灯的状态与状态文件一致。
