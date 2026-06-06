@@ -91,4 +91,5 @@ PRIORITY = {
 HEARTBEAT_TIMEOUT = 60  # 秒
 
 # 需要心跳检测的活跃状态（会被超时清除）
-ACTIVE_STATES = {"working", "thinking", "model", "alert"}
+# 注意：alert 不在此列，因为等待用户批准可能超过 60 秒
+ACTIVE_STATES = {"working", "thinking", "model"}
