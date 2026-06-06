@@ -88,10 +88,15 @@ def main():
     except (json.JSONDecodeError, EOFError, OSError):
         pass
 
-    # 如果没有 session_id，说明 hook 没正确传递数据，跳过
-    # 这样可以防止写入无意义的 "default" 文件
+    # 如果没有 session_id，说明 hook 没正确传递数据
+    # 对于 off 状态（会话结束），写入一个通用文件让守护进程关灯
+    # 其他状态跳过，防止写入无意义的 "default" 文件
     if not session_id:
-        sys.exit(0)
+        if state == "off":
+            # 写入全局 off 文件，守护进程会读取并关灯
+            session_id = "_global_off"
+        else:
+            sys.exit(0)
 
     # ----------------------------------------------------------
     # auto 模式：根据 tool_name 自动决定状态

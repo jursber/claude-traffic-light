@@ -7,6 +7,7 @@
   3. 按优先级选出最紧急的状态
   4. 通过串口发送对应指令给 ESP32C3
   5. 只有状态变化时才发指令，避免重复发送
+  6. 串口断开时自动扫描所有 USB 端口，重新连接
 
 为什么用守护进程？
   如果每个 hook 都自己开串口发指令，会有两个问题：
@@ -19,15 +20,56 @@ import os
 import time
 import json
 import serial
+import serial.tools.list_ports
 import sys
 
-from config import SERIAL_PORT, BAUD_RATE, COMMANDS, STATE_DIR, PRIORITY, HEARTBEAT_TIMEOUT, ACTIVE_STATES
+from config import ESP32_VID, BAUD_RATE, COMMANDS, STATE_DIR, PRIORITY, HEARTBEAT_TIMEOUT, ACTIVE_STATES
 
 # 轮询间隔（秒），50ms 响应足够快，人眼感觉不到延迟
 POLL_INTERVAL = 0.05
 
+# 串口断开后，扫描重连的间隔（秒）
+RECONNECT_INTERVAL = 2
+
 # 进程 ID 文件，用于检测守护进程是否在运行
 PID_FILE = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Temp", "cc_traffic_light_daemon.pid")
+
+
+def find_esp32_port() -> str:
+    """
+    扫描所有 USB 端口，找到 ESP32C3。
+
+    通过 USB VID（0x303A = Espressif）识别，不依赖固定的 COM 口号。
+    换 USB 口或重新插拔后都能自动找到。
+
+    Returns:
+        串口号（如 "COM3"），找不到返回 None
+    """
+    for port in serial.tools.list_ports.comports():
+        if port.vid == ESP32_VID:
+            return port.device
+    return None
+
+
+def open_serial(port: str) -> serial.Serial:
+    """
+    打开串口连接。
+
+    禁用 DTR/RTS 防止触发 ESP32C3 复位（踩坑记录第 3 条）。
+
+    Args:
+        port: 串口号（如 "COM3"）
+
+    Returns:
+        serial.Serial 对象
+
+    Raises:
+        serial.SerialException: 串口打开失败
+    """
+    ser = serial.Serial(port, BAUD_RATE, timeout=1, dsrdtr=False)
+    ser.dtr = False
+    ser.rts = False
+    return ser
 
 
 def read_all_states() -> dict:
@@ -38,14 +80,52 @@ def read_all_states() -> dict:
     心跳超时机制：活跃状态（working/thinking/model/alert）如果超过
     HEARTBEAT_TIMEOUT 秒没有更新，自动降级为 idle。
 
+    特殊文件：_global_off
+    当 SessionEnd hook 没有传递 session_id 时，会写入 _global_off 文件。
+    守护进程检测到此文件后，清除所有状态文件并关灯。
+
     Returns:
         {session_id: state_name} 的字典
     """
     states = {}
     if not os.path.exists(STATE_DIR):
         return states
+
     now = time.time()
-    for name in os.listdir(STATE_DIR):
+    files = os.listdir(STATE_DIR)
+
+    # ----------------------------------------------------------
+    # 检查 _global_off 文件
+    # ----------------------------------------------------------
+    # 如果存在且是最近 10 秒内写入的，清除所有状态并关灯
+    global_off_path = os.path.join(STATE_DIR, "_global_off")
+    if "_global_off" in files:
+        try:
+            with open(global_off_path, "r") as f:
+                raw = f.read().strip()
+            if raw.startswith("{"):
+                data = json.loads(raw)
+                ts = data.get("ts", 0)
+            else:
+                ts = 0
+            # 如果是最近 10 秒内写入的，执行全局关灯
+            if now - ts < 10:
+                # 清除所有其他状态文件
+                for name in files:
+                    if name.endswith(".tmp") or name == "_global_off":
+                        continue
+                    try:
+                        os.remove(os.path.join(STATE_DIR, name))
+                    except OSError:
+                        pass
+                return {"_global_off": "off"}
+        except (OSError, json.JSONDecodeError):
+            pass
+
+    # ----------------------------------------------------------
+    # 读取所有 session 状态文件
+    # ----------------------------------------------------------
+    for name in files:
         if name.endswith(".tmp"):
             continue  # 跳过临时文件
         path = os.path.join(STATE_DIR, name)
@@ -103,25 +183,35 @@ def main():
     os.makedirs(STATE_DIR, exist_ok=True)
 
     # ----------------------------------------------------------
-    # 打开串口
+    # 初始连接：打开串口
     # ----------------------------------------------------------
-    # dsrdtr=False + 手动设置 dtr/rts = False，防止触发 ESP32C3 复位
-    # 这是踩坑记录第 3 条的经验
-    print(f"正在打开 {SERIAL_PORT}（自动检测）...", flush=True)
-    try:
-        ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1, dsrdtr=False)
-        ser.dtr = False
-        ser.rts = False
-    except serial.SerialException as e:
-        print(f"无法打开 {SERIAL_PORT}: {e}", flush=True)
-        sys.exit(1)
+    ser = None
+    last_cmd = None  # 上一次发送的指令，避免重复发送
+
+    def connect():
+        """尝试连接 ESP32C3，返回 serial 对象或 None。"""
+        nonlocal ser
+        port = find_esp32_port()
+        if port is None:
+            return None
+        try:
+            ser = open_serial(port)
+            print(f"已连接 {port}", flush=True)
+            return ser
+        except serial.SerialException:
+            return None
+
+    # 首次连接
+    if connect() is None:
+        print("等待 ESP32C3 连接...", flush=True)
+        while connect() is None:
+            time.sleep(RECONNECT_INTERVAL)
 
     print("守护进程已启动。", flush=True)
 
     # ----------------------------------------------------------
     # 主循环：轮询状态文件，发送串口指令
     # ----------------------------------------------------------
-    last_cmd = None  # 上一次发送的指令，避免重复发送
     try:
         while True:
             # 1. 读取所有终端的状态
@@ -135,9 +225,28 @@ def main():
 
             # 4. 只有状态变化时才发送（减少串口流量）
             if cmd != last_cmd:
-                ser.write(cmd.encode("ascii"))
-                ser.flush()
-                last_cmd = cmd
+                try:
+                    ser.write(cmd.encode("ascii"))
+                    ser.flush()
+                    last_cmd = cmd
+                except (serial.SerialException, OSError):
+                    # 串口断开，尝试重连
+                    print("串口断开，正在重连...", flush=True)
+                    try:
+                        ser.close()
+                    except Exception:
+                        pass
+                    ser = None
+                    # 扫描所有端口，等待重新连接
+                    while connect() is None:
+                        time.sleep(RECONNECT_INTERVAL)
+                    # 重连后立即发送当前状态
+                    try:
+                        ser.write(cmd.encode("ascii"))
+                        ser.flush()
+                        last_cmd = cmd
+                    except (serial.SerialException, OSError):
+                        pass
 
             # 5. 等待下一次轮询
             time.sleep(POLL_INTERVAL)
@@ -147,12 +256,13 @@ def main():
         # ----------------------------------------------------------
         # 清理：关闭串口，删除 PID 文件
         # ----------------------------------------------------------
-        try:
-            ser.write(COMMANDS["off"].encode("ascii"))  # 关灯
-            ser.flush()
-        except Exception:
-            pass
-        ser.close()
+        if ser:
+            try:
+                ser.write(COMMANDS["off"].encode("ascii"))  # 关灯
+                ser.flush()
+            except Exception:
+                pass
+            ser.close()
         try:
             os.remove(PID_FILE)
         except OSError:
