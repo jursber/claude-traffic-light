@@ -1,10 +1,18 @@
-"""Called by hooks. Writes session-specific state file.
+"""
+状态设置脚本 - 被 CC hooks 调用的入口
 
-Reads session_id and tool_name from stdin JSON (provided by CC hooks).
+工作原理：
+  1. CC 触发 hook 事件（比如用户发消息、调用工具等）
+  2. hook 通过 stdin 传入 JSON（包含 session_id 和 tool_name）
+  3. 本脚本读取 JSON，把状态写到 {STATE_DIR}/{session_id} 文件
+  4. 守护进程检测到文件变化，通过串口发送指令给 ESP32C3
 
-Usage:
-  echo '{"session_id":"abc"}' | python set_state.py idle
-  echo '{"session_id":"abc","tool_name":"AskUserQuestion"}' | python set_state.py auto
+用法：
+  # 普通模式：直接指定状态
+  echo '{"session_id":"abc123"}' | python set_state.py idle
+
+  # 自动模式：根据 tool_name 自动决定状态
+  echo '{"session_id":"abc123","tool_name":"AskUserQuestion"}' | python set_state.py auto
 """
 
 import sys
@@ -13,11 +21,28 @@ import json
 
 from config import COMMANDS, STATE_DIR
 
-# Tools that should show "alert" instead of "working"
+# ============================================================
+# 需要显示"红灯闪烁"的工具列表
+# ============================================================
+# AskUserQuestion 是 CC 的交互式提问工具，用户需要操作
+# 所以它应该触发 alert 状态（红灯闪烁），而不是 working（绿灯常亮）
 ALERT_TOOLS = {"AskUserQuestion"}
 
 
 def set_state(state: str, session_id: str = "default") -> bool:
+    """
+    把状态写到指定 session 的状态文件。
+
+    使用"写临时文件再重命名"的方式，保证原子性：
+    防止守护进程读到写了一半的文件。
+
+    Args:
+        state: 状态名称（必须在 COMMANDS 中定义）
+        session_id: 会话 ID（每个 CC 终端唯一）
+
+    Returns:
+        True 写入成功，False 状态名无效
+    """
     if state not in COMMANDS:
         return False
     os.makedirs(STATE_DIR, exist_ok=True)
@@ -26,20 +51,25 @@ def set_state(state: str, session_id: str = "default") -> bool:
         tmp = state_file + ".tmp"
         with open(tmp, "w") as f:
             f.write(state)
-        os.replace(tmp, state_file)
+        os.replace(tmp, state_file)  # 原子替换，不会读到半写状态
         return True
     except OSError:
         return False
 
 
 def main():
+    # 至少需要一个参数：状态名
     if len(sys.argv) < 2:
-        print(f"Usage: {sys.argv[0]} <state|auto>", file=sys.stderr)
+        print(f"用法: {sys.argv[0]} <状态名|auto>", file=sys.stderr)
         sys.exit(1)
 
     state = sys.argv[1]
 
-    # Read stdin JSON
+    # ----------------------------------------------------------
+    # 从 stdin 读取 CC hook 传来的 JSON
+    # ----------------------------------------------------------
+    # CC 每次触发 hook 时，会把事件信息以 JSON 格式传到 stdin
+    # 包含 session_id（会话ID）、tool_name（工具名）等字段
     session_id = ""
     tool_name = ""
     try:
@@ -51,17 +81,24 @@ def main():
     except (json.JSONDecodeError, EOFError, OSError):
         pass
 
-    # Skip if no session_id (hook didn't provide it)
+    # 如果没有 session_id，说明 hook 没正确传递数据，跳过
+    # 这样可以防止写入无意义的 "default" 文件
     if not session_id:
         sys.exit(0)
 
-    # Auto mode: decide state based on tool_name
+    # ----------------------------------------------------------
+    # auto 模式：根据 tool_name 自动决定状态
+    # ----------------------------------------------------------
+    # PreToolUse hook 使用 auto 模式
+    # 如果工具在 ALERT_TOOLS 中 → alert（红灯闪烁）
+    # 其他工具 → working（绿灯常亮）
     if state == "auto":
         if tool_name in ALERT_TOOLS:
             state = "alert"
         else:
             state = "working"
 
+    # 写入状态文件
     sys.exit(0 if set_state(state, session_id) else 1)
 
 
