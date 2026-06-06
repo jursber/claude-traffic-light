@@ -17,7 +17,7 @@ Set objShell = CreateObject("WScript.Shell")
 Set objFSO = CreateObject("Scripting.FileSystemObject")
 
 ' 守护进程所在的目录
-strDir = "E:\Cursor\claude_traffic_light"
+strDir = "C:\Users\Administrator\.claude\traffic_light"
 
 ' pythonw.exe 的路径（hermes venv 中的无窗口 Python）
 strPythonW = objShell.ExpandEnvironmentStrings("%LOCALAPPDATA%") & "\hermes\hermes-agent\venv\Scripts\pythonw.exe"
