@@ -20,11 +20,13 @@ from config import COMMANDS, STATE_DIR
 
 
 def set_state(state: str, session_id: str = "") -> bool:
-    """写入状态文件。"""
+    """写入状态文件。没有 session_id 时不写入（避免残留文件）。"""
     if state not in COMMANDS:
         return False
+    if not session_id:
+        return False  # 没有 session_id 就不写，防止 _global_alert 残留
     os.makedirs(STATE_DIR, exist_ok=True)
-    state_file = os.path.join(STATE_DIR, session_id or "_global_alert")
+    state_file = os.path.join(STATE_DIR, session_id)
     try:
         data = json.dumps({"state": state, "ts": time.time()})
         tmp = state_file + ".tmp"
