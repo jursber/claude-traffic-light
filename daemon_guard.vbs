@@ -16,6 +16,51 @@ Dim objShell, objFSO
 Set objShell = CreateObject("WScript.Shell")
 Set objFSO = CreateObject("Scripting.FileSystemObject")
 
+' ============================================================
+' 防重复运行：用 lock 文件 + WMI 检查
+' ============================================================
+strLockFile = objShell.ExpandEnvironmentStrings("%LOCALAPPDATA%") & "\Temp\cc_daemon_guard.lock"
+Dim bAlreadyRunning
+bAlreadyRunning = False
+
+If objFSO.FileExists(strLockFile) Then
+    Dim strOldPID
+    strOldPID = ""
+    On Error Resume Next
+    strOldPID = Trim(objFSO.OpenTextFile(strLockFile).ReadAll)
+    On Error GoTo 0
+
+    If strOldPID <> "" Then
+        ' 检查该 PID 是否还在运行
+        Dim objWMIService, colProcesses
+        Set objWMIService = GetObject("winmgmts:\\.\root\cimv2")
+        Set colProcesses = objWMIService.ExecQuery("SELECT ProcessId FROM Win32_Process WHERE ProcessId = " & strOldPID)
+        If colProcesses.Count > 0 Then
+            bAlreadyRunning = True
+        End If
+    End If
+End If
+
+If bAlreadyRunning Then
+    WScript.Quit
+End If
+
+' 获取当前进程 PID 并写入 lock 文件
+' 通过 WMI 查找最新的 wscript.exe 进程
+Dim myPID
+Set colWmi = GetObject("winmgmts:\\.\root\cimv2").ExecQuery( _
+    "SELECT ProcessId FROM Win32_Process WHERE Name = 'wscript.exe' ORDER BY ProcessId DESC")
+myPID = 0
+For Each p In colWmi
+    myPID = p.ProcessId
+    Exit For  ' 取最新的
+Next
+
+Dim objLockFile
+Set objLockFile = objFSO.CreateTextFile(strLockFile, True)
+objLockFile.Write CStr(myPID)
+objLockFile.Close
+
 ' 守护进程所在的目录
 strDir = "C:\Users\Administrator\.claude\traffic_light"
 

@@ -128,7 +128,7 @@ ser.rts = False
 **解决**：
 1. `set_state.py` 增加 `_global_off` 机制：当 session_id 为空且状态为 "off" 时，写入 `_global_off` 文件
 2. `daemon.py` 检测到 `_global_off` 文件后，清除所有状态文件并关灯
-3. 过期文件清理：状态文件超过 30 分钟未更新自动删除
+3. 心跳超时机制作为兜底：活跃状态超过 60 秒自动降级为 idle
 
 ## 16. 守护进程不发 off 命令
 
@@ -137,37 +137,3 @@ ser.rts = False
 **原因**：守护进程的 `last_cmd` 变量记录了上次发送的指令。如果上次发送的是 off，删除状态文件后不会重复发送。
 
 **解决**：守护进程启动时强制发送一次当前状态，确保灯的状态与状态文件一致。
-
-## 17. `_global_alert` 文件永远残留
-
-**现象**：红灯一直闪烁，状态目录里有 `_global_alert` 文件，时间戳是几十分钟前。
-
-**原因**：`set_alert_and_defer.py` 在没有 session_id 时会创建 `_global_alert` 文件。这个文件没有对应的 SessionEnd hook 来清理，也不在心跳超时检测范围内（alert 状态被排除在 ACTIVE_STATES 之外）。
-
-**解决**：`set_alert_and_defer.py` 在没有 session_id 时不再写入文件。PermissionRequest hook 一定会传递 session_id，所以正常流程不受影响。
-
-## 18. 计划任务启动的 daemon 秒死
-
-**现象**：用 `schtasks /Create` 注册的计划任务启动 daemon 后，进程立即退出，日志只有"守护进程启动"没有"串口已连接"。
-
-**原因**：计划任务默认在 Session 0（非交互式会话）中运行，无法访问 COM 端口。daemon 连不上 ESP32C3 就退出了。
-
-**解决**：
-1. 计划任务改用 XML 定义，指定 `<LogonType>InteractiveToken</LogonType>` 在用户会话中运行
-2. 看门狗用 `Start-Process` 启动 daemon（在用户会话中），不依赖计划任务直接启动
-
-## 19. WMI 读不到 Start-Process 启动的进程命令行
-
-**现象**：用 `Start-Process` 启动 daemon 后，`Get-CimInstance Win32_Process` 查不到 `daemon.py` 命令行，看门狗误判为 daemon 未运行。
-
-**原因**：`Start-Process` 启动的进程在 WMI 中命令行可能为空（特别是 `-WindowStyle Hidden` 时）。
-
-**解决**：看门狗改用 PID 文件检测 daemon 是否在运行，不依赖 WMI 命令行匹配。
-
-## 20. 权限批准后红灯一直闪
-
-**现象**：PermissionRequest 触发红灯闪烁，用户批准后红灯一直闪，直到下一次工具调用才恢复。
-
-**原因**：权限批准后工具执行，但没有 hook 在工具完成时清除 alert 状态。PostToolBatch 在批次结束时设置 thinking，但 alert 优先级更高，一直赢。
-
-**解决**：在 `settings.json` 的 PostToolUse 中添加兜底 hook（matcher=""），每个工具完成后设置 working 状态，覆盖 alert。

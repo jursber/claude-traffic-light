@@ -23,9 +23,9 @@
 
 多个 CC 终端同时运行时，灯显示**优先级最高**的状态。
 
-### 过期文件清理
+### 心跳超时
 
-状态文件超过 30 分钟未更新，自动删除。防止 session 崩溃后残留状态永远占着灯。
+活跃状态（working/thinking/model/alert）超过 60 秒未更新，自动降级为 idle。防止 CC 崩溃后灯永远亮着。
 
 ### 断线重连
 
@@ -34,17 +34,6 @@
 ### 全局关灯
 
 SessionEnd hook 写入 `_global_off` 文件，守护进程清除所有状态文件并关灯。确保退出 CC 后灯正确熄灭。
-
-## 容错机制
-
-守护进程有多层保护，确保任意时刻都能正常工作：
-
-| 层 | 机制 | 恢复时间 |
-|---|---|---|
-| 第 1 层 | daemon.py 内部无限循环 + BaseException 捕获 + 自动重启 | 即时 |
-| 第 2 层 | 看门狗计划任务（每分钟检查 PID 文件） | ≤1 分钟 |
-| 第 3 层 | SessionStart hook 调用 start_daemon.py | 下次开 CC 窗口 |
-| 第 4 层 | 启动文件夹 VBScript 守护脚本 | 下次登录 |
 
 ## 硬件
 
@@ -60,7 +49,7 @@ CC Hook 触发 → set_state.py 写状态文件(带时间戳)
                      ↓
               daemon.py 读取所有 session 文件
                      ↓
-              按优先级选最高 + 过期文件清理
+              按优先级选最高 + 心跳超时检测
                      ↓
               串口发送 → ESP32C3 点灯
 ```
@@ -69,16 +58,11 @@ CC Hook 触发 → set_state.py 写状态文件(带时间戳)
 
 | 文件 | 作用 |
 |------|------|
-| `config.py` | 自动检测串口 + 状态/优先级配置 |
-| `daemon.py` | 串口守护进程，多会话聚合 + 断线重连 + 自动重启 + 过期清理 + 日志 |
+| `config.py` | 自动检测串口 + 状态/优先级/心跳超时配置 |
+| `daemon.py` | 串口守护进程，多会话聚合 + 断线重连 |
 | `set_state.py` | Hook 调用入口，读 session_id 写状态文件（JSON 格式） |
-| `set_alert_and_defer.py` | PermissionRequest hook 专用，设置 alert 并返回 defer |
 | `start_daemon.py` | 自动启动守护进程（幂等） |
 | `daemon_guard.vbs` | 守护脚本，崩溃自动重启（放在启动文件夹） |
-| `daemon_watchdog.ps1` | 看门狗脚本，通过 PID 文件检测并重启 daemon |
-| `daemon_task.xml` | 计划任务 XML 定义（登录时自动启动） |
-| `install_daemon_task.bat` | 注册计划任务 |
-| `install_watchdog.bat` | 注册看门狗计划任务 |
 | `install_service.py` | 注册 Windows 计划任务（备用方案） |
 | `test_all.py` | 全量测试脚本 |
 | `arduino/traffic_light.ino` | ESP32C3 固件 |
@@ -89,15 +73,11 @@ CC Hook 触发 → set_state.py 写状态文件(带时间戳)
 2. 烧录 `arduino/traffic_light.ino` 到 ESP32C3
 3. Arduino IDE 中启用 **Tools → USB CDC On Boot → Enabled**
 4. 关闭 Arduino IDE 串口监视器
-5. 注册看门狗计划任务（管理员运行）：
-   ```
-   install_watchdog.bat
-   ```
-6. 将 `daemon_guard.vbs` 复制到启动文件夹（可选备份方案）：
+5. 将 `daemon_guard.vbs` 复制到启动文件夹：
    ```
    %APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\
    ```
-7. 运行 `python test_all.py` 验证
+6. 运行 `python test_all.py` 验证
 
 Hooks 已配置在 `~/.claude/settings.json`，启动 CC 后自动生效。
 
