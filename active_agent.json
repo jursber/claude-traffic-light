@@ -1,0 +1,15 @@
+{
+  "active": "claude",
+  "agents": {
+    "claude": {
+      "name": "Claude Code",
+      "state_dir": "cc_tl_states",
+      "hooks_config": "~/.claude/settings.json"
+    },
+    "codex": {
+      "name": "OpenAI Codex",
+      "state_dir": "codex_tl_states",
+      "hooks_config": "~/.codex/hooks.json"
+    }
+  }
+}

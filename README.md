@@ -1,6 +1,6 @@
 # Claude Code Traffic Light
 
-用硬件红绿灯实时显示 Claude Code 的工作状态。支持多终端并行，优先级显示。
+用硬件红绿灯实时显示 Claude Code / OpenAI Codex 的工作状态。支持多终端并行、优先级显示，以及在 Claude Code 和 Codex 之间切换。
 
 ## 灯光状态
 
@@ -60,8 +60,13 @@ CC Hook 触发 → set_state.py 写状态文件(带时间戳)
 |------|------|
 | `config.py` | 自动检测串口 + 状态/优先级/心跳超时配置 |
 | `daemon.py` | 串口守护进程，多会话聚合 + 断线重连 |
+| `daemon_unified.py` | 统一守护进程，按 `active_agent.json` 读取 Claude Code 或 Codex 状态目录 |
 | `set_state.py` | Hook 调用入口，读 session_id 写状态文件（JSON 格式） |
+| `set_state_unified.py` | 统一 Hook 调用入口，支持 Claude Code / Codex 状态目录切换 |
+| `switch_agent.py` | 在 Claude Code 和 OpenAI Codex hooks 之间切换 |
 | `start_daemon.py` | 自动启动守护进程（幂等） |
+| `start_daemon_unified.py` | 统一守护进程启动器 |
+| `UNIFIED_README.md` | Claude Code / Codex 切换说明 |
 | `daemon_guard.vbs` | 守护脚本，崩溃自动重启（放在启动文件夹） |
 | `install_service.py` | 注册 Windows 计划任务（备用方案） |
 | `test_all.py` | 全量测试脚本 |
