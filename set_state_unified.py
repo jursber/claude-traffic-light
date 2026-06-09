@@ -20,7 +20,7 @@ import threading
 # 添加项目目录到路径
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from config import COMMANDS, STATE_DIR
+from config import COMMANDS
 
 # ============================================================
 # 配置文件路径
@@ -30,6 +30,7 @@ CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "active_a
 # 需要显示"红灯闪烁"的工具列表
 ALERT_TOOLS = {"AskUserQuestion", "question"}
 STDIN_TIMEOUT = 0.2
+LAST_SESSION_FILE = "_last_session"
 
 
 def load_config():
@@ -55,6 +56,39 @@ def get_state_dir():
     return os.path.join(os.environ.get("LOCALAPPDATA", ""), "Temp", state_dir_name)
 
 
+def is_normal_session_id(session_id: str) -> bool:
+    """Return True for real session files, excluding internal metadata."""
+    return bool(session_id) and not session_id.startswith("_") and session_id == os.path.basename(session_id)
+
+
+def read_last_session_id() -> str:
+    """Read the most recent real session id."""
+    path = os.path.join(get_state_dir(), LAST_SESSION_FILE)
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            session_id = f.read().strip()
+    except OSError:
+        return ""
+    return session_id if is_normal_session_id(session_id) else ""
+
+
+def write_last_session_id(session_id: str) -> None:
+    """Remember the latest real session for idle hooks that omit session_id."""
+    if not is_normal_session_id(session_id):
+        return
+
+    state_dir = get_state_dir()
+    os.makedirs(state_dir, exist_ok=True)
+    path = os.path.join(state_dir, LAST_SESSION_FILE)
+    tmp = path + ".tmp"
+    try:
+        with open(tmp, "w", encoding="utf-8") as f:
+            f.write(session_id)
+        os.replace(tmp, path)
+    except OSError:
+        pass
+
+
 def set_state(state: str, session_id: str = "default") -> bool:
     """把状态写到指定 session 的状态文件"""
     if state not in COMMANDS:
@@ -70,6 +104,7 @@ def set_state(state: str, session_id: str = "default") -> bool:
         with open(tmp, "w") as f:
             f.write(data)
         os.replace(tmp, state_file)
+        write_last_session_id(session_id)
         return True
     except OSError:
         return False
@@ -117,6 +152,10 @@ def main():
     if not session_id:
         if state == "off":
             session_id = "_global_off"
+        elif state == "idle":
+            session_id = read_last_session_id()
+            if not session_id:
+                sys.exit(0)
         else:
             sys.exit(0)
 

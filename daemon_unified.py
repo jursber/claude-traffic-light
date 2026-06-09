@@ -141,7 +141,7 @@ def read_all_states() -> dict:
 
     # 读取所有 session 状态文件
     for name in files:
-        if name.endswith(".tmp"):
+        if name.endswith(".tmp") or name == "_last_session":
             continue
         path = os.path.join(state_dir, name)
         try:
