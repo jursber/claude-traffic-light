@@ -49,6 +49,8 @@ log = logging.getLogger("daemon")
 POLL_INTERVAL = 0.05
 RECONNECT_INTERVAL = 2
 ERROR_RETRY_INTERVAL = 1
+ACTIVE_STATE_TTL = 300  # 5 minutes
+ACTIVE_STATES = {"model", "working", "thinking"}
 STATE_FILE_TTL = 1800  # 30 分钟
 
 # 进程 ID 文件
@@ -98,6 +100,15 @@ def open_serial(port: str) -> serial.Serial:
     ser.dtr = False
     ser.rts = False
     return ser
+
+
+def write_state_file(path: str, state: str, ts: float = None) -> None:
+    """Write a state file atomically."""
+    data = json.dumps({"state": state, "ts": ts or time.time()})
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
+        f.write(data)
+    os.replace(tmp, path)
 
 
 def read_all_states() -> dict:
@@ -153,9 +164,21 @@ def read_all_states() -> dict:
                 ts = data.get("ts", 0)
             else:
                 state = raw
-                ts = 0
+                try:
+                    ts = os.path.getmtime(path)
+                except OSError:
+                    ts = 0
 
             # 过期清理：超过 30 分钟未更新的非 off 文件自动删除
+            if state in ACTIVE_STATES and ts > 0 and now - ts > ACTIVE_STATE_TTL:
+                log.info("Session %s state %s expired after %.0fs; falling back to idle", name, state, now - ts)
+                state = "idle"
+                ts = now
+                try:
+                    write_state_file(path, state, ts)
+                except OSError:
+                    pass
+
             if ts > 0 and now - ts > STATE_FILE_TTL and state != "off":
                 try:
                     os.remove(path)
