@@ -49,7 +49,7 @@ log = logging.getLogger("daemon")
 POLL_INTERVAL = 0.05
 RECONNECT_INTERVAL = 2
 ERROR_RETRY_INTERVAL = 1
-ACTIVE_STATE_TTL = 300  # 5 minutes
+ACTIVE_STATE_TTL = 3600  # 1 hour
 ACTIVE_STATES = {"model", "working", "thinking"}
 STATE_FILE_TTL = 1800  # 30 分钟
 

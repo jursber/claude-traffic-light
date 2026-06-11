@@ -1,5 +1,5 @@
 {
-  "active": "claude",
+  "active": "codex",
   "agents": {
     "claude": {
       "name": "Claude Code",
