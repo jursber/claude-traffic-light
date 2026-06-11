@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python C:/Users/Administrator/.claude/traffic_light/set_state_unified.py thinking",
+            "command": "python C:/Users/Administrator/.claude/traffic_light/set_state_unified.py prompt",
             "shell": "powershell",
             "timeout": 5
           }

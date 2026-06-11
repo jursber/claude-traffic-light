@@ -135,7 +135,7 @@ def claude_hook_groups():
             hook_group(hook_command("start_daemon_unified.py", ""), timeout=10),
         ],
         "UserPromptSubmit": [
-            hook_group(hook_command("set_state_unified.py", "thinking")),
+            hook_group(hook_command("set_state_unified.py", "prompt")),
         ],
         "PreToolUse": [
             hook_group(hook_command("set_state_unified.py", "auto")),
@@ -165,7 +165,7 @@ def codex_hook_groups():
     """Codex 的红绿灯 hooks。"""
     return {
         "UserPromptSubmit": [
-            hook_group(hook_command("set_state_unified.py", "thinking")),
+            hook_group(hook_command("set_state_unified.py", "prompt")),
         ],
         "PreToolUse": [
             hook_group(hook_command("set_state_unified.py", "auto")),

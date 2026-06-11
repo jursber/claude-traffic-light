@@ -126,6 +126,19 @@ def read_stdin_with_timeout(timeout: float = STDIN_TIMEOUT) -> str:
     return result["raw"] if not thread.is_alive() else ""
 
 
+def has_prompt_text(data: dict) -> bool:
+    """Return True when hook input contains a non-empty user prompt."""
+    for key in ("prompt", "user_prompt", "message", "text"):
+        value = data.get(key)
+        if isinstance(value, str) and value.strip():
+            return True
+        if isinstance(value, dict):
+            content = value.get("content")
+            if isinstance(content, str) and content.strip():
+                return True
+    return False
+
+
 def main():
     if len(sys.argv) < 2:
         print(f"用法: {sys.argv[0]} <状态名|auto>", file=sys.stderr)
@@ -136,6 +149,7 @@ def main():
     # 从 stdin 读取 hook 传来的 JSON
     session_id = ""
     tool_name = ""
+    data = {}
     try:
         raw = read_stdin_with_timeout().strip()
         json_start = raw.find("{")
@@ -147,6 +161,12 @@ def main():
             tool_name = data.get("tool_name", "")
     except (json.JSONDecodeError, EOFError, OSError):
         pass
+
+    if state == "prompt":
+        if has_prompt_text(data):
+            state = "thinking"
+        else:
+            sys.exit(0)
 
     # 如果没有 session_id，非 off 状态直接跳过，避免残留 default 状态抢占显示
     if not session_id:
