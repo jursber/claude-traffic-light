@@ -12,6 +12,7 @@ import sys
 import json
 
 from claude_tl._paths import active_agent_path, repo_root
+from claude_tl.hook_light_catalog import iter_claude_wired_hook_groups, iter_codex_wired_hook_groups
 
 CONFIG_FILE = str(active_agent_path())
 CC_HOOKS_FILE = os.path.join(os.path.expanduser("~"), ".claude", "settings.json")
@@ -156,57 +157,13 @@ def add_hook_groups(config, hook_groups):
 
 
 def claude_hook_groups():
-    """Claude Code 的红绿灯 hooks。"""
-    return {
-        "SessionStart": [
-            hook_group(hook_command("start_daemon_unified.py", ""), timeout=10),
-        ],
-        "UserPromptSubmit": [
-            hook_group(hook_command("set_state_unified.py", "prompt")),
-        ],
-        "PreToolUse": [
-            hook_group(hook_command("set_state_unified.py", "auto")),
-        ],
-        "PostToolBatch": [
-            hook_group(hook_command("set_state_unified.py", "thinking")),
-        ],
-        "Stop": [
-            hook_group(hook_command("set_state_unified.py", "idle")),
-        ],
-        "PermissionRequest": [
-            hook_group(hook_command("set_alert_and_defer.py", "")),
-        ],
-        "Notification": [
-            hook_group(hook_command("set_state_unified.py", "alert"), matcher="permission_prompt"),
-        ],
-        "StopFailure": [
-            hook_group(hook_command("set_state_unified.py", "alert")),
-        ],
-        "SessionEnd": [
-            hook_group(hook_command("set_state_unified.py", "off")),
-        ],
-    }
+    """Claude Code 的红绿灯 hooks（由 hook_light_catalog 声明，集中维护）。"""
+    return iter_claude_wired_hook_groups(hook_command, hook_group)
 
 
 def codex_hook_groups():
-    """Codex 的红绿灯 hooks。"""
-    return {
-        "UserPromptSubmit": [
-            hook_group(hook_command("set_state_unified.py", "prompt")),
-        ],
-        "PreToolUse": [
-            hook_group(hook_command("set_state_unified.py", "auto")),
-        ],
-        "PostToolUse": [
-            hook_group(hook_command("set_state_unified.py", "thinking")),
-        ],
-        "Stop": [
-            hook_group(hook_command("set_state_unified.py", "idle")),
-        ],
-        "SessionEnd": [
-            hook_group(hook_command("set_state_unified.py", "off")),
-        ],
-    }
+    """Codex 的红绿灯 hooks（由 hook_light_catalog 声明）。"""
+    return iter_codex_wired_hook_groups(hook_command, hook_group)
 
 
 def set_claude_hooks(enable):

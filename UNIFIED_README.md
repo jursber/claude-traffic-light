@@ -81,13 +81,17 @@ python tests/test_unified.py test
 
 ## Hook 事件映射
 
-| 状态 | Claude Code 事件 | Codex 事件 |
-|------|------------------|------------|
-| thinking | UserPromptSubmit / PostToolBatch | UserPromptSubmit / PostToolUse |
-| working | PreToolUse (auto) | PreToolUse (auto) |
-| alert | PermissionRequest / Notification / StopFailure / PreToolUse (auto) | PreToolUse (auto) |
-| idle | Stop | Stop |
-| off | SessionEnd | SessionEnd |
+> **全量事件名与默认接线**以 **`docs/HOOK_EVENTS_REFERENCE.md`** 与 **`src/claude_tl/hook_light_catalog.py`** 为准（Claude 官方文档约 30 个生命周期事件；Codex 以 OpenAI 文档为准）。下表为**状态语义**与**代表性事件**的简图，便于对照守护进程优先级。
+
+| 状态 | Claude Code（代表性事件） | Codex（代表性事件） |
+|------|--------------------------|----------------------|
+| thinking | `UserPromptSubmit` / `PostToolBatch` / `SubagentStart` / `PreCompact` / … | `UserPromptSubmit` / `PostToolUse` / `SubagentStart` / `PreCompact` / … |
+| working | `PreToolUse`(auto) / `PostToolUse` / `SubagentStop` / … | `PreToolUse`(auto) / `SubagentStop` / … |
+| alert | `PermissionRequest` / `Notification` / `StopFailure` / `PermissionDenied` / `Elicitation` / … | `PermissionRequest` / `PreToolUse`(auto) / … |
+| idle | `Stop` / `PostCompact` / `Setup` / … | `Stop` / `PostCompact` / … |
+| off | `SessionEnd` | `SessionEnd` |
+
+另：`SessionStart` 仅用于启动统一守护进程，不映射上表「灯色状态」。
 
 ## 安装步骤
 

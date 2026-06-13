@@ -29,10 +29,11 @@ pip install -e .
 - 切换 agent：`python switch_agent.py claude` / `codex` / `status`
 - 手动测试灯：`python tests/test_all.py`（需守护进程已运行）
 
-## 硬件与 BLE
+## 硬件与 BLE（VibeLight）
 
-- 接线、固件命令：见 `arduino/traffic_light/` 与 [arduino/traffic_light/BLE.md](arduino/traffic_light/BLE.md)
-- PC 侧 BLE：`set CC_TL_TRANSPORT=ble`，`python tests/test_ble.py` 做冒烟
+- 接线、固件、**v1 扩展协议**（PWM / 组合 / 呼吸 / 亮度）：见 `arduino/traffic_light/`、[docs/VIBELIGHT_PROTOCOL.md](docs/VIBELIGHT_PROTOCOL.md)、[arduino/traffic_light/BLE.md](arduino/traffic_light/BLE.md)、[arduino/traffic_light/TUNING.md](arduino/traffic_light/TUNING.md)（USB-only 与守护进程抢串口等排查）、[arduino/traffic_light/DEBUGGING_EXPERIENCE.md](arduino/traffic_light/DEBUGGING_EXPERIENCE.md)（呼吸/PWM 问题与经验备忘）
+- 桌面调试台：`python tools/vibelight_gui.py`（[tools/README.md](tools/README.md)）；Hook×灯效配置：`python tools/tl_hook_light_gui.py`（见 [docs/HOOK_EVENTS_REFERENCE.md](docs/HOOK_EVENTS_REFERENCE.md)）
+- PC 侧 BLE 冒烟：`python tests/test_ble.py`；守护进程仍用 `set CC_TL_TRANSPORT=ble`（默认设备名 **VibeLight**）
 
 ## 打 exe（V3 不被旧文件污染）
 

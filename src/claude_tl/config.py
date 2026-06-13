@@ -28,7 +28,7 @@ BAUD_RATE = 115200
 # BLE（可选，与固件 traffic_light.ino 中 UUID 保持一致）
 # ============================================================
 # 守护进程默认仍用 USB 串口；设置环境变量 CC_TL_TRANSPORT=ble 启用 BLE。
-BLE_DEVICE_NAME = os.environ.get("CC_TL_BLE_NAME", "CC-TrafficLight")
+BLE_DEVICE_NAME = os.environ.get("CC_TL_BLE_NAME", "VibeLight")
 BLE_SERVICE_UUID = "e52c12b6-7ac3-4636-9c17-3d608bcea796"
 BLE_CHAR_UUID = "e52c12b7-7ac3-4636-9c17-3d608bcea796"
 

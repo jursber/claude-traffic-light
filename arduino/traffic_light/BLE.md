@@ -1,6 +1,10 @@
 # ESP32-C3 固件 BLE 说明
 
-固件在保留 **USB 串口 115200** 的同时，增加 **BLE GATT 服务**，与 PC 端 `bleak` 使用相同的 UUID。
+固件在保留 **USB 串口 115200** 的同时，增加 **BLE GATT 服务**，并支持 **v1 二进制灯控帧**（PWM 亮度 / 组合 / 同步闪 / 呼吸）与旧版 **ASCII 单字节** 兼容。详见 [docs/VIBELIGHT_PROTOCOL.md](../../docs/VIBELIGHT_PROTOCOL.md)。
+
+## LEDC / 编译说明（Arduino ESP32 3.x）
+
+固件 PWM 初始化使用 **`ledcAttach(pin, freq, resolution)`**（每个 GPIO 一次），亮度通过 **`ledcWrite(pin, duty)`** 写入，与 Arduino-ESP32 3.x 一致。若你仍使用 2.x core，需自行将 `pwmHardwareInit()` 改回 `ledcSetup` + `ledcAttachPin` + 按通道号的 `ledcWrite`。
 
 ## 依赖
 
@@ -16,11 +20,14 @@
 
 | 项 | 值 |
 |----|-----|
-| 广播名 | `CC-TrafficLight` |
+| 广播名 | `VibeLight`（可用环境变量 `CC_TL_BLE_NAME` 覆盖 PC 端） |
 | Service UUID | `e52c12b6-7ac3-4636-9c17-3d608bcea796` |
 | 可写特征 UUID | `e52c12b7-7ac3-4636-9c17-3d608bcea796` |
 
-写入特征的数据为 **ASCII 单字节**（与 USB 串口相同），例如 `G`、`g`、`O` 等。
+写入特征的数据可为：
+
+- **12 字节定长**或 **12+n 字节**（`cmd=2` 自定义呼吸曲线，n≤32，总长 ≤44）二进制帧（魔数 `0xA5 0x5A`，见协议文档）；或
+- **ASCII 单字节**（`G`、`g`、`O` 等，与旧版一致）。
 
 ## 若 `onWrite` / `onDisconnect` 签名编译失败
 
@@ -62,7 +69,7 @@ set CC_TL_TRANSPORT=ble
 可选：自定义广播名（与固件 `BLE_DEVICE_NAME` 一致时再改固件）：
 
 ```text
-set CC_TL_BLE_NAME=CC-TrafficLight
+set CC_TL_BLE_NAME=VibeLight
 ```
 
 默认仍为 **USB 串口**（不设 `CC_TL_TRANSPORT` 或设为 `serial`）。
