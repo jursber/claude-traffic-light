@@ -1,103 +1,58 @@
-# Claude Code Traffic Light
+# Claude Code Traffic Light（V3 布局）
 
-用硬件红绿灯实时显示 Claude Code / OpenAI Codex 的工作状态。支持多终端并行、优先级显示，以及在 Claude Code 和 Codex 之间切换。
+用硬件红绿灯显示 **Claude Code** / **OpenAI Codex** 的工作状态（ESP32-C3 + 三色灯）。  
+**V3**：可安装 Python 包 `claude_tl`（源码在 `src/claude_tl`），根目录 `.py` 仅为薄启动器，便于旧 hook 与 VBS 继续工作。
 
-## 灯光状态
+> **小白说明**：仓库结构、Git 标签/分支、与打 exe 的关系见 **[docs/V3_LAYOUT_AND_GIT.md](docs/V3_LAYOUT_AND_GIT.md)**。  
+> **V2.0 冻结代码**：Git 标签 **`V2.0`**（可选远程分支 `archive/v2.0`），不要依赖磁盘上的 `.old` 文件夹。
 
-| 状态 | 灯光 | 含义 | 优先级 |
-|------|------|------|--------|
-| alert | 🔴 红灯闪烁 | 需要用户授权 / API 或工具出错 / CC 问你问题 | 1 (最高) |
-| thinking | 🟡 黄灯闪烁 | 思考中 | 2 |
-| model | 🟢 绿灯闪烁 | 调用模型中，等待 API 响应 | 3 |
-| working | 🟢 绿灯常亮 | 拿到回复，正在写代码/执行操作 | 4 |
-| idle | 🔴 红灯常亮 | CC 完成回复，等待输入 | 5 |
-| off | ⚫ 全灭 | 会话结束 | 6 (最低) |
+## 目录一览
 
-### 状态流转
-
-```
-用户发消息 → thinking(黄闪) → model(绿闪) → working(绿亮) → model(绿闪) → ... → idle(红亮)
-```
-
-### 多终端优先级
-
-多个 CC 终端同时运行时，灯显示**优先级最高**的状态。
-
-### 心跳超时
-
-活跃状态（working/thinking/model/alert）超过 60 秒未更新，自动降级为 idle。防止 CC 崩溃后灯永远亮着。
-
-### 断线重连
-
-守护进程检测到串口断开时，自动扫描所有 USB 端口，找到 ESP32C3 后重新连接。换 USB 口或拔插后无需手动干预。
-
-### 全局关灯
-
-SessionEnd hook 写入 `_global_off` 文件，守护进程清除所有状态文件并关灯。确保退出 CC 后灯正确熄灭。
-
-## 硬件
-
-- ESP32C3 开发板
-- 三色 LED 模块（绿/黄/红）
-- 接线：GPIO0=绿，GPIO1=黄，GPIO2=红（有源低电平）
-- 串口自动检测（通过 Espressif USB VID 0x303A）
-
-## 软件架构
-
-```
-CC Hook 触发 → set_state.py 写状态文件(带时间戳)
-                     ↓
-              daemon.py 读取所有 session 文件
-                     ↓
-              按优先级选最高 + 心跳超时检测
-                     ↓
-              串口发送 → ESP32C3 点灯
-```
-
-### 文件说明
-
-| 文件 | 作用 |
+| 路径 | 作用 |
 |------|------|
-| `config.py` | 自动检测串口 + 状态/优先级/心跳超时配置 |
-| `daemon.py` | 串口守护进程，多会话聚合 + 断线重连 |
-| `daemon_unified.py` | 统一守护进程，按 `active_agent.json` 读取 Claude Code 或 Codex 状态目录 |
-| `set_state.py` | Hook 调用入口，读 session_id 写状态文件（JSON 格式） |
-| `set_state_unified.py` | 统一 Hook 调用入口，支持 Claude Code / Codex 状态目录切换 |
-| `switch_agent.py` | 在 Claude Code 和 OpenAI Codex hooks 之间切换 |
-| `start_daemon.py` | 自动启动守护进程（幂等） |
-| `start_daemon_unified.py` | 统一守护进程启动器 |
-| `UNIFIED_README.md` | Claude Code / Codex 切换说明 |
-| `daemon_guard.vbs` | 守护脚本，崩溃自动重启（放在启动文件夹） |
-| `install_service.py` | 注册 Windows 计划任务（备用方案） |
-| `test_all.py` | 全量测试脚本 |
-| `arduino/traffic_light.ino` | ESP32C3 固件 |
+| `src/claude_tl/` | **唯一业务源码**（守护进程、BLE/串口、set_state、switch_agent） |
+| `daemon_unified.py` 等根脚本 | 把 `src/` 加入路径后调用包内逻辑（**不要**在这里写业务） |
+| `tests/` | 手动/冒烟测试（不打进 exe） |
+| `extras/legacy_windows/` | 旧计划任务/NSSM 等脚本（**不打进**默认 exe） |
+| `packaging/pyinstaller/` | PyInstaller 规格，**只收集** `claude_tl` |
+| `arduino/` | 固件 `.ino` + `BLE.md` |
 
-## 安装
-
-1. 安装 pyserial：`pip install pyserial`
-2. 烧录 `arduino/traffic_light.ino` 到 ESP32C3
-3. Arduino IDE 中启用 **Tools → USB CDC On Boot → Enabled**
-4. 关闭 Arduino IDE 串口监视器
-5. 将 `daemon_guard.vbs` 复制到启动文件夹：
-   ```
-   %APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\
-   ```
-6. 运行 `python test_all.py` 验证
-
-Hooks 已配置在 `~/.claude/settings.json`，启动 CC 后自动生效。
-
-## 手动控制
+## 安装与运行
 
 ```bash
-# 启动守护进程
-python daemon.py
-
-# 手动切换状态
-echo '{"session_id":"test"}' | python set_state.py idle
-python set_state.py thinking
-python set_state.py alert
+pip install -r requirements.txt
+# 推荐开发体验（可选）：
+pip install -e .
 ```
 
-## 踩坑记录
+- 统一守护进程：`python daemon_unified.py` 或 `python -m claude_tl daemon-unified`
+- 切换 agent：`python switch_agent.py claude` / `codex` / `status`
+- 手动测试灯：`python tests/test_all.py`（需守护进程已运行）
 
-见 [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
+## 硬件与 BLE
+
+- 接线、固件命令：见 `arduino/traffic_light/` 与 [arduino/traffic_light/BLE.md](arduino/traffic_light/BLE.md)
+- PC 侧 BLE：`set CC_TL_TRANSPORT=ble`，`python tests/test_ble.py` 做冒烟
+
+## 打 exe（V3 不被旧文件污染）
+
+见 [packaging/pyinstaller/README.md](packaging/pyinstaller/README.md)。spec 入口为 `packaging/pyinstaller/entry.py`，**仅**分析 `src/claude_tl` 依赖链；`tests/`、`extras/` 不会进入包分析。
+
+## 环境变量（常用）
+
+| 变量 | 作用 |
+|------|------|
+| `CC_TL_TRANSPORT` | `serial`（默认）或 `ble` |
+| `CC_TL_HOME` | `active_agent.json` 所在目录（默认仓库根） |
+| `CC_TL_REPO_ROOT` | hook 里写的路径与克隆位置不一致时，指向仓库根 |
+
+## 开机守护（Windows）
+
+将 `daemon_guard_unified.vbs` 放到启动文件夹；脚本已改为**自动使用 vbs 所在目录**为项目根，不再写死 Administrator 路径。请本机安装好 Python，或把 `pythonw` 路径写进 vbs 顶部变量。
+
+## 更多文档
+
+- [UNIFIED_README.md](UNIFIED_README.md) — Claude / Codex 切换
+- [TROUBLESHOOTING.md](TROUBLESHOOTING.md) — 踩坑
+- [MIGRATION_GUIDE.md](MIGRATION_GUIDE.md) — 迁移说明
+- 旧 **install_service** 等：见 `extras/legacy_windows/README.md`

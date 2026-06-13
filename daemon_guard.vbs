@@ -6,9 +6,9 @@ Set fso = CreateObject("Scripting.FileSystemObject")
 Set wmi = GetObject("winmgmts:\\.\root\cimv2")
 
 lockFile = shell.ExpandEnvironmentStrings("%LOCALAPPDATA%") & "\Temp\cc_daemon_guard.lock"
-projectDir = "C:\Users\Administrator\.claude\traffic_light"
+projectDir = fso.GetParentFolderName(WScript.ScriptFullName)
 pythonw = "C:\Program Files\Python312\pythonw.exe"
-scriptName = "daemon_unified.py"
+scriptName = "daemon.py"
 
 If Not fso.FileExists(pythonw) Then
     pythonw = "pythonw.exe"

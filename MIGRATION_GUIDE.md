@@ -1,5 +1,7 @@
 # Claude Code 红绿灯项目 - 迁移教程
 
+> **V3 提示**：Python 业务代码已迁至 `src/claude_tl/`；计划任务安装脚本在 `extras/legacy_windows/`。总览见 [docs/V3_LAYOUT_AND_GIT.md](docs/V3_LAYOUT_AND_GIT.md)。
+
 本教程指导你将红绿灯项目迁移到新电脑。此教程面向新电脑上的 Claude Code，帮助它理解项目结构并完成部署。
 
 ---
@@ -58,7 +60,7 @@ claude_traffic_light/
 ├── start_daemon.py           # 自动启动守护进程（幂等）
 ├── start_daemon_hidden.bat   # 隐藏窗口启动批处理
 ├── start_daemon_hidden.vbs   # 隐藏窗口启动 VBScript
-├── test_all.py               # 全量测试脚本
+├── tests/                    # 手动/冒烟测试
 ├── README.md                 # 项目说明
 ├── TROUBLESHOOTING.md        # 踩坑记录
 ├── MIGRATION_GUIDE.md        # 本迁移教程
@@ -321,7 +323,7 @@ schtasks /Create /TN "ClaudeTrafficLightWatchdog" /TR "powershell.exe -NoProfile
 1. 插入 ESP32C3 开发板
 2. 运行测试脚本：
    ```bash
-   python test_all.py
+   python tests/test_all.py
    ```
 3. 观察灯的变化，确认所有状态都正确
 
@@ -426,7 +428,7 @@ python set_state.py thinking
 python set_state.py alert
 
 # 运行全量测试
-python test_all.py
+python tests/test_all.py
 
 # 安装/卸载计划任务
 python install_service.py

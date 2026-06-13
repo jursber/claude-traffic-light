@@ -24,7 +24,7 @@ Codex hooks ─┘
 | `start_daemon_unified.py` | 统一守护进程启动器 |
 | `daemon_guard_unified.vbs` | 统一守护脚本（开机自启） |
 | `switch_agent.py` | Agent 切换脚本 |
-| `test_unified.py` | 测试脚本 |
+| `tests/test_unified.py` | 测试脚本 |
 
 ## 使用方法
 
@@ -49,7 +49,7 @@ python switch_agent.py status
 ### 4. 测试红绿灯
 
 ```bash
-python test_unified.py test
+python tests/test_unified.py test
 ```
 
 ## 配置文件
@@ -109,13 +109,13 @@ python daemon_unified.py
 cscript daemon_guard_unified.vbs
 
 # 方式 3：安装为计划任务
-python install_service.py
+python extras/legacy_windows/install_service.py
 ```
 
 ### 4. 验证安装
 
 ```bash
-python test_unified.py test
+python tests/test_unified.py test
 ```
 
 ## 切换 Agent

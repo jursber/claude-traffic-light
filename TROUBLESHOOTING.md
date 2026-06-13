@@ -85,7 +85,7 @@ ser.rts = False
 
 **原因**：用 `run_in_background` 启动的后台任务会在会话结束时被清理。即使用 `DETACHED_PROCESS` 标志也不生效。
 
-**解决**：用 Windows 任务计划程序（`schtasks`）注册守护进程为登录自启任务，完全独立于 CC。通过 `install_service.py` 安装。
+**解决**：用 Windows 任务计划程序（`schtasks`）注册守护进程为登录自启任务，完全独立于 CC。通过 `extras/legacy_windows/install_service.py` 安装。
 
 ## 11. S4U 计划任务无法访问 COM 端口
 
