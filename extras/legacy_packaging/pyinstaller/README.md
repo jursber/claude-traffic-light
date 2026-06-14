@@ -9,7 +9,7 @@ pip install -r requirements.txt pyinstaller
 在**仓库根目录**执行：
 
 ```bash
-pyinstaller packaging/pyinstaller/claude_tl.spec
+pyinstaller extras/legacy_packaging/pyinstaller/claude_tl.spec
 ```
 
 产出：`dist/claude-tl/claude-tl.exe`（目录模式，含依赖 DLL）。

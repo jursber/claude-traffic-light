@@ -62,8 +62,8 @@ claude_traffic_light/
 ├── start_daemon_hidden.vbs   # 隐藏窗口启动 VBScript
 ├── tests/                    # 手动/冒烟测试
 ├── README.md                 # 项目说明
-├── TROUBLESHOOTING.md        # 踩坑记录
-├── MIGRATION_GUIDE.md        # 本迁移教程
+├── docs/TROUBLESHOOTING.md   # 踩坑记录
+├── docs/MIGRATION_GUIDE.md   # 本迁移教程
 ├── query                     # 查询任务名
 ├── start                     # 启动任务名
 ├── nssm.zip                  # NSSM 工具（用于创建 Windows 服务）

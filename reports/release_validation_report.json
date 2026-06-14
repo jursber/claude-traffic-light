@@ -1,0 +1,86 @@
+{
+  "generated_at": "2026-06-14 18:38:51",
+  "overall_ok": true,
+  "results": [
+    {
+      "name": "static_layout",
+      "ok": true,
+      "missing": [],
+      "unexpected_root_markdown": []
+    },
+    {
+      "name": "pyinstaller_spec_syntax",
+      "ok": true,
+      "duration_s": 0.137,
+      "path": "packaging\\vibelight.spec"
+    },
+    {
+      "name": "compileall",
+      "ok": true,
+      "returncode": 0,
+      "duration_s": 1.288,
+      "cmd": "C:\\Users\\Administrator\\AppData\\Local\\hermes\\hermes-agent\\venv\\Scripts\\python.exe -m compileall -q src tools daemon.py daemon_unified.py set_state.py set_state_unified.py set_alert_and_defer.py start_daemon.py start_daemon_unified.py switch_agent.py",
+      "stdout_tail": "",
+      "stderr_tail": ""
+    },
+    {
+      "name": "pytest",
+      "ok": true,
+      "returncode": 0,
+      "duration_s": 13.464,
+      "cmd": "C:\\Users\\Administrator\\AppData\\Local\\hermes\\hermes-agent\\venv\\Scripts\\python.exe -m pytest -q --tb=short",
+      "stdout_tail": "............                                                             [100%]\r\n",
+      "stderr_tail": ""
+    },
+    {
+      "name": "e2e_selftest_batch",
+      "ok": true,
+      "returncode": 0,
+      "duration_s": 26.925,
+      "cmd": "C:\\Users\\Administrator\\AppData\\Local\\hermes\\hermes-agent\\venv\\Scripts\\python.exe tools/e2e_selftest.py --batch",
+      "stdout_tail": "E2E selftest — E:\\Cursor\\claude_traffic_light\r\n  [OK ] LAMP_alert: batch: 已跳过目视（CC_TL_E2E_BATCH=1 或非 TTY）\r\n  [OK ] LAMP_idle: batch: 已跳过目视（CC_TL_E2E_BATCH=1 或非 TTY）\r\n  [OK ] LAMP_model: batch: 已跳过目视（CC_TL_E2E_BATCH=1 或非 TTY）\r\n  [OK ] LAMP_off: batch: 已跳过目视（CC_TL_E2E_BATCH=1 或非 TTY）\r\n  [OK ] LAMP_thinking: batch: 已跳过目视（CC_TL_E2E_BATCH=1 或非 TTY）\r\n  [OK ] LAMP_working: batch: 已跳过目视（CC_TL_E2E_BATCH=1 或非 TTY）\r\n  [OK ] T_cursor_hooks: hooks.json OK\r\n  [OK ] T_daemon_lock2: 第二实例抢锁失败已记入日志\r\n  [OK ] T_daemon_start: daemon 已起且硬件已连接\r\n  [OK ] T_edge_auto: auto→working OK\r\n  [OK ] T_edge_invalid_state: 非法 argv 状态已拒绝\r\n  [OK ] T_hook_cmd: C:\\Users\\Administrator\\AppData\\Local\\hermes\\hermes-agent\\venv\\Scripts\\python.exe E:\\Cursor\\claude_traffic_light\\set_state_unified.py thinking\r\n  [OK ] T_kill: 已杀相关进程并尝试删 lock\r\n  [OK ] T_lamp_suite: 全套目视通过\r\n  [OK ] T_pytest: pytest OK\r\n  [OK ] T_stdin_prompt: prompt→thinking 落盘 OK\r\n  [OK ] T_switch_claude: switch_agent.py claude OK\r\n  [OK ] T_switch_cursor: switch_agent.py cursor OK\r\n  [OK ] T_switch_cursor2: switch_agent.py cursor OK\r\nReport: E:\\Cursor\\claude_traffic_light\\reports\\e2e_selftest_report.json\r\nPlan:  E:\\Cursor\\claude_traffic_light\\reports\\E2E_MODIFICATION_PLAN.md\r\n",
+      "stderr_tail": ""
+    },
+    {
+      "name": "build_script_syntax",
+      "ok": true,
+      "returncode": 0,
+      "duration_s": 0.283,
+      "cmd": "powershell -NoProfile -NonInteractive -Command \"$ErrorActionPreference='Stop'; [scriptblock]::Create((Get-Content -Raw -LiteralPath 'packaging\\build_win.ps1')) | Out-Null\"",
+      "stdout_tail": "",
+      "stderr_tail": ""
+    },
+    {
+      "name": "pyinstaller_build",
+      "ok": true,
+      "returncode": 0,
+      "duration_s": 39.919,
+      "cmd": "powershell -NoProfile -ExecutionPolicy Bypass -File packaging\\build_win.ps1 -Clean",
+      "stdout_tail": "Repo root: E:\\Cursor\\claude_traffic_light\nPython: python\nCleaning build/ and dist/ ...\nInstalling/updating packaging dependencies ...\nRequirement already satisfied: pip in C:\\Users\\Administrator\\AppData\\Local\\hermes\\hermes-agent\\venv\\Lib\\site-packages (26.1.2)\r\nRequirement already satisfied: pyinstaller in C:\\Users\\Administrator\\AppData\\Local\\hermes\\hermes-agent\\venv\\Lib\\site-packages (6.21.0)\r\nRequirement already satisfied: pyinstaller-hooks-contrib in C:\\Users\\Administrator\\AppData\\Local\\hermes\\hermes-agent\\venv\\Lib\\site-packages (2026.6)\r\nRequirement already satisfied: altgraph in C:\\Users\\Administrator\\AppData\\Local\\hermes\\hermes-agent\\venv\\Lib\\site-packages (from pyinstaller) (0.17.5)\r\nRequirement already satisfied: packaging>=22.0 in C:\\Users\\Administrator\\AppData\\Local\\hermes\\hermes-agent\\venv\\Lib\\site-packages (from pyinstaller) (26.0)\r\nRequirement already satisfied: pefile>=2022.5.30 in C:\\Users\\Administrator\\AppData\\Local\\hermes\\hermes-agent\\venv\\Lib\\site-packages (from pyinstaller) (2024.8.26)\r\nRequirement already satisfied: pywin32-ctypes>=0.2.1 in C:\\Users\\Administrator\\AppData\\Local\\hermes\\hermes-agent\\venv\\Lib\\site-packages (from pyinstaller) (0.2.3)\r\nRequirement already satisfied: setuptools>=42.0.0 in C:\\Users\\Administrator\\AppData\\Local\\hermes\\hermes-agent\\venv\\Lib\\site-packages (from pyinstaller) (82.0.1)\r\nRequirement already satisfied: pyserial>=3.5 in C:\\Users\\Administrator\\AppData\\Local\\hermes\\hermes-agent\\venv\\Lib\\site-packages (from -r requirements.txt (line 1)) (3.5)\r\nRequirement already satisfied: bleak>=0.21.0 in C:\\Users\\Administrator\\AppData\\Local\\hermes\\hermes-agent\\venv\\Lib\\site-packages (from -r requirements.txt (line 2)) (3.0.2)\r\nRequirement already satisfied: pystray>=0.19.5 in C:\\Users\\Administrator\\AppData\\Local\\hermes\\hermes-agent\\venv\\Lib\\site-packages (from -r requirements.txt (line 3)) (0.19.5)\r\nRequirement already satisfied: Pillow>=10.0.0 in C:\\Users\\Administrator\\AppData\\Local\\hermes\\hermes-agent\\venv\\Lib\\site-packages (from -r requirements.txt (line 4)) (12.2.0)\r\nRequirement already satisfied: typing-extensions>=4.7.0 in C:\\Users\\Administrator\\AppData\\Local\\hermes\\hermes-agent\\venv\\Lib\\site-packages (from bleak>=0.21.0->-r requirements.txt (line 2)) (4.15.0)\r\nRequirement already satisfied: winrt-runtime>=3.1 in C:\\Users\\Administrator\\AppData\\Local\\hermes\\hermes-agent\\venv\\Lib\\site-packages (from bleak>=0.21.0->-r requirements.txt (line 2)) (3.2.1)\r\nRequirement already satisfied: winrt-windows-devices-bluetooth>=3.1 in C:\\Users\\Administrator\\AppData\\Local\\hermes\\hermes-agent\\venv\\Lib\\site-packages (from bleak>=0.21.0->-r requirements.txt (line 2)) (3.2.1)\r\nRequirement already satisfied: winrt-windows-devices-bluetooth-advertisement>=3.1 in C:\\Users\\Administrator\\AppData\\Local\\hermes\\hermes-agent\\venv\\Lib\\site-packages (from bleak>=0.21.0->-r requirements.txt (line 2)) (3.2.1)\r\nRequirement already satisfied: winrt-windows-devices-bluetooth-genericattributeprofile>=3.1 in C:\\Users\\Administrator\\AppData\\Local\\hermes\\hermes-agent\\venv\\Lib\\site-packages (from bleak>=0.21.0->-r requirements.txt (line 2)) (3.2.1)\r\nRequirement already satisfied: winrt-windows-devices-enumeration>=3.1 in C:\\Users\\Administrator\\AppData\\Local\\hermes\\hermes-agent\\venv\\Lib\\site-packages (from bleak>=0.21.0->-r requirements.txt (line 2)) (3.2.1)\r\nRequirement already satisfied: winrt-windows-devices-radios>=3.1 in C:\\Users\\Administrator\\AppData\\Local\\hermes\\hermes-agent\\venv\\Lib\\site-packages (from bleak>=0.21.0->-r requirements.txt (line 2)) (3.2.1)\r\nRequirement already satisfied: winrt-windows-foundation>=3.1 in C:\\Users\\Administrator\\AppData\\Local\\hermes\\hermes-agent\\venv\\Lib\\site-packages (from bleak>=0.21.0->-r requirements.txt (line 2)) (3.2.1)\r\nRequirement already satisfied: winrt-windows-foundation-collections>=3.1 in C:\\Users\\Administrator\\AppData\\Local\\hermes\\hermes-agent\\venv\\Lib\\site-packages (from bleak>=0.21.0->-r requirements.txt (line 2)) (3.2.1)\r\nRequirement already satisfied: winrt-windows-storage-streams>=3.1 in C:\\Users\\Administrator\\AppData\\Local\\hermes\\hermes-agent\\venv\\Lib\\site-packages (from bleak>=0.21.0->-r requirements.txt (line 2)) (3.2.1)\r\nRequirement already satisfied: six in C:\\Users\\Administrator\\AppData\\Local\\hermes\\hermes-agent\\venv\\Lib\\site-packages (from pystray>=0.19.5->-r requirements.txt (line 3)) (1.17.0)\r\nBuilding VibeLight ...\n\nBuild succeeded: E:\\Cursor\\claude_traffic_light\\dist\\VibeLight\\VibeLight.exe\nSmoke test (subcommand dispatch):\n当前激活的 agent: claude\r\nAgent 配置:\r\n\nDistribute the whole dist\\VibeLight folder (onedir, includes runtime dependencies).\n",
+      "stderr_tail": "\\Administrator\\\\AppData\\\\Local\\\\hermes\\\\hermes-agent\\\\venv\\\\Lib\\\\site-packages\\\\PyInstaller\\\\hooks'\r\n14776 INFO: Processing standard module hook 'hook-sysconfig.py' from 'C:\\\\Users\\\\Administrator\\\\AppData\\\\Local\\\\hermes\\\\hermes-agent\\\\venv\\\\Lib\\\\site-packages\\\\PyInstaller\\\\hooks'\r\n15319 INFO: Processing standard module hook 'hook-webbrowser.py' from 'C:\\\\Users\\\\Administrator\\\\AppData\\\\Local\\\\hermes\\\\hermes-agent\\\\venv\\\\Lib\\\\site-packages\\\\PyInstaller\\\\hooks'\r\n15371 INFO: Processing standard module hook 'hook-psutil.py' from 'C:\\\\Users\\\\Administrator\\\\AppData\\\\Local\\\\hermes\\\\hermes-agent\\\\venv\\\\Lib\\\\site-packages\\\\_pyinstaller_hooks_contrib\\\\stdhooks'\r\n16979 INFO: Processing standard module hook 'hook-charset_normalizer.py' from 'C:\\\\Users\\\\Administrator\\\\AppData\\\\Local\\\\hermes\\\\hermes-agent\\\\venv\\\\Lib\\\\site-packages\\\\_pyinstaller_hooks_contrib\\\\stdhooks'\r\n17297 INFO: Processing standard module hook 'hook-xml.etree.cElementTree.py' from 'C:\\\\Users\\\\Administrator\\\\AppData\\\\Local\\\\hermes\\\\hermes-agent\\\\venv\\\\Lib\\\\site-packages\\\\PyInstaller\\\\hooks'\r\n17386 INFO: Processing standard module hook 'hook-xml.dom.domreg.py' from 'C:\\\\Users\\\\Administrator\\\\AppData\\\\Local\\\\hermes\\\\hermes-agent\\\\venv\\\\Lib\\\\site-packages\\\\PyInstaller\\\\hooks'\r\n17819 INFO: Processing standard module hook 'hook-PIL.ImageFilter.py' from 'C:\\\\Users\\\\Administrator\\\\AppData\\\\Local\\\\hermes\\\\hermes-agent\\\\venv\\\\Lib\\\\site-packages\\\\PyInstaller\\\\hooks'\r\n18280 INFO: Processing standard module hook 'hook-pystray.py' from 'C:\\\\Users\\\\Administrator\\\\AppData\\\\Local\\\\hermes\\\\hermes-agent\\\\venv\\\\Lib\\\\site-packages\\\\_pyinstaller_hooks_contrib\\\\stdhooks'\r\n19143 INFO: Processing pre-safe-import-module hook 'hook-six.moves.py' from 'C:\\\\Users\\\\Administrator\\\\AppData\\\\Local\\\\hermes\\\\hermes-agent\\\\venv\\\\Lib\\\\site-packages\\\\PyInstaller\\\\hooks\\\\pre_safe_import_module'\r\n19396 INFO: Processing pre-safe-import-module hook 'hook-gi.py' from 'C:\\\\Users\\\\Administrator\\\\AppData\\\\Local\\\\hermes\\\\hermes-agent\\\\venv\\\\Lib\\\\site-packages\\\\PyInstaller\\\\hooks\\\\pre_safe_import_module'\r\n19467 INFO: Analyzing hidden import 'PIL._tkinter_finder'\r\n19468 INFO: Analyzing hidden import 'bleak.backends._manufacturers'\r\n19514 INFO: Processing module hooks (post-graph stage)...\r\n19839 INFO: Processing standard module hook 'hook-PIL.SpiderImagePlugin.py' from 'C:\\\\Users\\\\Administrator\\\\AppData\\\\Local\\\\hermes\\\\hermes-agent\\\\venv\\\\Lib\\\\site-packages\\\\PyInstaller\\\\hooks'\r\n19882 INFO: Processing standard module hook 'hook-_tkinter.py' from 'C:\\\\Users\\\\Administrator\\\\AppData\\\\Local\\\\hermes\\\\hermes-agent\\\\venv\\\\Lib\\\\site-packages\\\\PyInstaller\\\\hooks'\r\n19895 INFO: Performing binary vs. data reclassification (925 entries)\r\n20285 INFO: Looking for ctypes DLLs\r\n20314 WARNING: Ignoring /System/Library/Frameworks/CoreFoundation.framework/CoreFoundation imported from C:\\Users\\Administrator\\AppData\\Local\\hermes\\hermes-agent\\venv\\Lib\\site-packages\\serial\\tools\\list_ports_osx.py - only basenames are supported with ctypes imports!\r\n20314 WARNING: Ignoring /System/Library/Frameworks/IOKit.framework/IOKit imported from C:\\Users\\Administrator\\AppData\\Local\\hermes\\hermes-agent\\venv\\Lib\\site-packages\\serial\\tools\\list_ports_osx.py - only basenames are supported with ctypes imports!\r\n20486 INFO: Analyzing run-time hooks ...\r\n20490 INFO: Including run-time hook 'pyi_rth_inspect.py' from 'C:\\\\Users\\\\Administrator\\\\AppData\\\\Local\\\\hermes\\\\hermes-agent\\\\venv\\\\Lib\\\\site-packages\\\\PyInstaller\\\\hooks\\\\rthooks'\r\n20495 INFO: Including run-time hook 'pyi_rth_pkgutil.py' from 'C:\\\\Users\\\\Administrator\\\\AppData\\\\Local\\\\hermes\\\\hermes-agent\\\\venv\\\\Lib\\\\site-packages\\\\PyInstaller\\\\hooks\\\\rthooks'\r\n20499 INFO: Including run-time hook 'pyi_rth_multiprocessing.py' from 'C:\\\\Users\\\\Administrator\\\\AppData\\\\Local\\\\hermes\\\\hermes-agent\\\\venv\\\\Lib\\\\site-packages\\\\PyInstaller\\\\hooks\\\\rthooks'\r\n20502 INFO: Including run-time hook 'pyi_rth__tkinter.py' from 'C:\\\\Users\\\\Administrator\\\\AppData\\\\Local\\\\hermes\\\\hermes-agent\\\\venv\\\\Lib\\\\site-packages\\\\PyInstaller\\\\hooks\\\\rthooks'\r\n20544 INFO: Creating base_library.zip...\r\n20616 INFO: Looking for dynamic libraries\r\n21466 INFO: Extra DLL search directories (AddDllDirectory): ['C:\\\\Users\\\\Administrator\\\\AppData\\\\Local\\\\hermes\\\\hermes-agent\\\\venv\\\\Lib\\\\site-packages\\\\numpy.libs']\r\n21466 INFO: Extra DLL search directories (PATH): []\r\n23652 INFO: Warnings written to E:\\Cursor\\claude_traffic_light\\build\\vibelight\\warn-vibelight.txt\r\n23751 INFO: Graph cross-reference written to E:\\Cursor\\claude_traffic_light\\build\\vibelight\\xref-vibelight.html\r\n23815 INFO: checking PYZ\r\n23815 INFO: Building PYZ because PYZ-00.toc is non existent\r\n23815 INFO: Building PYZ (ZlibArchive) E:\\Cursor\\claude_traffic_light\\build\\vibelight\\PYZ-00.pyz\r\n24695 INFO: Building PYZ (ZlibArchive) E:\\Cursor\\claude_traffic_light\\build\\vibelight\\PYZ-00.pyz completed successfully.\r\n24712 INFO: checking PKG\r\n24713 INFO: Building PKG because PKG-00.toc is non existent\r\n24713 INFO: Building PKG (CArchive) VibeLight.pkg\r\n24769 INFO: Building PKG (CArchive) VibeLight.pkg completed successfully.\r\n24772 INFO: Bootloader C:\\Users\\Administrator\\AppData\\Local\\hermes\\hermes-agent\\venv\\Lib\\site-packages\\PyInstaller\\bootloader\\Windows-64bit-intel\\run.exe\r\n24772 INFO: checking EXE\r\n24775 INFO: Building EXE because EXE-00.toc is non existent\r\n24775 INFO: Building EXE from EXE-00.toc\r\n24775 INFO: Copying bootloader EXE to E:\\Cursor\\claude_traffic_light\\build\\vibelight\\VibeLight.exe\r\n24823 INFO: Copying icon to EXE\r\n24854 INFO: Copying 0 resources to EXE\r\n24854 INFO: Embedding manifest in EXE\r\n24870 INFO: Appending PKG archive to EXE\r\n24876 INFO: Fixing EXE headers\r\n24966 INFO: Building EXE from EXE-00.toc completed successfully.\r\n24975 INFO: checking COLLECT\r\n24976 INFO: Building COLLECT because COLLECT-00.toc is non existent\r\n24976 INFO: Building COLLECT COLLECT-00.toc\r\n29551 INFO: Building COLLECT COLLECT-00.toc completed successfully.\r\n29586 INFO: Build complete! The results are available in: E:\\Cursor\\claude_traffic_light\\dist\r\n"
+    },
+    {
+      "name": "exe_smoke",
+      "ok": true,
+      "duration_s": 0.337,
+      "status": {
+        "name": "exe_status",
+        "ok": true,
+        "returncode": 0,
+        "duration_s": 0.175,
+        "cmd": "E:\\Cursor\\claude_traffic_light\\dist\\VibeLight\\VibeLight.exe switch-agent status",
+        "stdout_tail": "当前激活的 agent: claude\r\nAgent 配置:\r\n",
+        "stderr_tail": ""
+      },
+      "invalid_state": {
+        "name": "exe_invalid_state",
+        "ok": false,
+        "returncode": 1,
+        "duration_s": 0.161,
+        "cmd": "E:\\Cursor\\claude_traffic_light\\dist\\VibeLight\\VibeLight.exe set-state-unified not_a_real_state",
+        "stdout_tail": "",
+        "stderr_tail": ""
+      }
+    }
+  ]
+}

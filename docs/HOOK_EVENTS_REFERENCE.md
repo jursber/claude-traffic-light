@@ -10,7 +10,7 @@
 ## V2.0 除 Hook 外还用到了什么？
 
 Git 标签 **`V2.0`** 下同样是：**Hook 脚本极薄**（`set_state.py` / `set_state_unified.py`）只写 **`%LOCALAPPDATA%\Temp\` 下状态文件**；**`daemon.py` / `daemon_unified.py` 常驻**占串口、合并多会话优先级后驱动灯。  
-因此除 hooks 外，核心是 **守护进程 + 状态文件 IPC**，不是 MCP 轮询灯态。详见 `UNIFIED_README.md`、`TROUBLESHOOTING.md`。
+因此除 hooks 外，核心是 **守护进程 + 状态文件 IPC**，不是 MCP 轮询灯态。详见 `docs/UNIFIED_README.md`、`docs/TROUBLESHOOTING.md`。
 
 ---
 
@@ -92,7 +92,7 @@ Git 标签 **`V2.0`** 下同样是：**Hook 脚本极薄**（`set_state.py` / `s
 ## GUI 与 `tl_hook_light_gui.json`
 
 - **Agent 切换**：写 `active_agent.json` 并改写 Claude / Codex / Cursor 的 hooks；完成后应 **重启对应 IDE 或 Agent 会话**（Cursor 见官方说明，常需重启应用）。
-- **灯光/优先级表**：存 `config/tl_hook_light_gui.json`；默认行与 **`hook_light_catalog.default_hook_gui_row()`** 对齐（V2 状态语义）。**守护进程按 hook 映射灯效** 仍为后续工作。
+- **灯光/优先级表**：存 `config/tl_hook_light_gui.json`；默认行与 **`hook_light_catalog.default_hook_gui_row()`** 对齐。`set_state_unified.py --event <事件名>` 会把命中的 per-hook 灯效写入状态文件，守护进程据此发扩展帧。
 - **多会话与优先级说明**：见 `docs/MULTI_SESSION_AND_EFFECT_PRIORITY.md`。
 - **Codex 官方事件数量与「非 Hook」灯控路径**：见 `docs/CODEX_HOOKS_AND_LIGHT_PATHS.md`。
 

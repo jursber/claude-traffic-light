@@ -112,7 +112,7 @@ python tests/test_unified.py test
 
 ### 2. 配置 Codex hooks
 
-将 `hooks_traffic_light.json` 的内容合并到 `~/.codex/hooks.json`
+将 `extras/legacy_hooks/hooks_traffic_light.json` 的内容合并到 `~/.codex/hooks.json`
 
 ### 3. 启动守护进程
 

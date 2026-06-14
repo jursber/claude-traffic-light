@@ -37,6 +37,7 @@ from claude_tl.tl_transport import transport_mode, wait_for_transport
 # 日志配置
 # ============================================================
 LOG_FILE = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Temp", "cc_traffic_light_daemon.log")
+os.makedirs(os.path.dirname(LOG_FILE) or ".", exist_ok=True)
 
 logging.basicConfig(
     level=logging.INFO,

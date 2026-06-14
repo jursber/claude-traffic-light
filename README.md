@@ -12,9 +12,10 @@
 |------|------|
 | `src/claude_tl/` | **唯一业务源码**（守护进程、BLE/串口、set_state、switch_agent） |
 | `daemon_unified.py` 等根脚本 | 把 `src/` 加入路径后调用包内逻辑（**不要**在这里写业务） |
-| `tests/` | 手动/冒烟测试（不打进 exe） |
+| `tests/` | 自动回归 + 手动硬件冒烟测试（不打进 exe） |
 | `extras/legacy_windows/` | 旧计划任务/NSSM 等脚本（**不打进**默认 exe） |
-| `packaging/pyinstaller/` | PyInstaller 规格，**只收集** `claude_tl` |
+| `extras/legacy_packaging/` | 旧打包脚手架归档（不作为当前上线入口） |
+| `packaging/` | 当前 Windows 打包脚本与 `VibeLight.exe` spec |
 | `arduino/` | 固件 `.ino` + `BLE.md` |
 
 ## 安装与运行
@@ -27,6 +28,8 @@ pip install -e .
 
 - 统一守护进程：`python daemon_unified.py` 或 `python -m claude_tl daemon-unified`
 - 切换 agent：`python switch_agent.py claude` / `codex` / `cursor` / `status`
+- 自动回归：`python -m pytest`
+- 上线前整体验证：`python tests/release_validation.py`
 - 手动测试灯：`python tests/test_all.py`（需守护进程已运行）
 
 ## 硬件与 BLE（VibeLight）
@@ -37,7 +40,7 @@ pip install -e .
 
 ## 打 exe（V3 不被旧文件污染）
 
-见 [packaging/pyinstaller/README.md](packaging/pyinstaller/README.md)。spec 入口为 `packaging/pyinstaller/entry.py`，**仅**分析 `src/claude_tl` 依赖链；`tests/`、`extras/` 不会进入包分析。
+见 [docs/BUILD_AND_DISTRIBUTE.md](docs/BUILD_AND_DISTRIBUTE.md)。当前入口为 `packaging/build_win.ps1`，spec 为 `packaging/vibelight.spec`，产物是 `dist/VibeLight/VibeLight.exe`；`tests/`、`extras/` 不会进入包分析。
 
 ## 环境变量（常用）
 
@@ -53,7 +56,7 @@ pip install -e .
 
 ## 更多文档
 
-- [UNIFIED_README.md](UNIFIED_README.md) — Claude / Codex 切换
-- [TROUBLESHOOTING.md](TROUBLESHOOTING.md) — 踩坑
-- [MIGRATION_GUIDE.md](MIGRATION_GUIDE.md) — 迁移说明
+- [docs/UNIFIED_README.md](docs/UNIFIED_README.md) — Claude / Codex 切换
+- [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) — 踩坑
+- [docs/MIGRATION_GUIDE.md](docs/MIGRATION_GUIDE.md) — 迁移说明
 - 旧 **install_service** 等：见 `extras/legacy_windows/README.md`

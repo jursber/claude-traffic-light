@@ -5,7 +5,7 @@
 - Codex 事件来源：https://developers.openai.com/codex/hooks（matcher 表 + 正文；另含本仓库已使用的 SessionEnd）。
 - Cursor 事件名与 `hooks.json` 键一致：https://cursor.com/docs/hooks（Agent / Tab / workspaceOpen；2026-06）。
 
-V2.0（tag）除 hooks 外：依赖 **守护进程 + 状态文件**（hook 只调 `set_state*.py` 写 `%TEMP%` 下状态，由 daemon 占串口），见 `UNIFIED_README.md` / `TROUBLESHOOTING.md`。
+V2.0（tag）除 hooks 外：依赖 **守护进程 + 状态文件**（hook 只调 `set_state*.py` 写 `%TEMP%` 下状态，由 daemon 占串口），见 `docs/UNIFIED_README.md` / `docs/TROUBLESHOOTING.md`。
 """
 
 from __future__ import annotations

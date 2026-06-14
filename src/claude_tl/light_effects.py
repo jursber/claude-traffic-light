@@ -1,23 +1,13 @@
 """
-状态 → 灯效（扩展帧）的「单一真相源」。
+灯效与 SET_LIGHTING 扩展帧的「单一真相源」。
 
-daemon 显示状态灯、GUI 配置「状态灯效」面板都从这里取默认值、做读写与转帧，
-避免两边各写一套导致「保存了但 daemon 不认」。
+当前上线方案以 `config/tl_hook_light_gui.json` 中 Claude/Codex/Cursor 三个标签页的
+per-hook `rows` 为配置入口：每行提供 `effect`、`mask`、`priority`，全局亮度与周期
+来自 `basic`。`set_state_unified.py --event <事件名>` 命中行后会把灯效写入状态文件，
+daemon 再按状态文件直接生成扩展帧。
 
-配置存放在 config/tl_hook_light_gui.json 顶层的 "state_effects"：
-
-    "state_effects": {
-        "<state>": {
-            "mode":      "off" | "solid" | "blink" | "breath",
-            "mask":      0..7,          # 位：G=1, Y=2, R=4（可组合）
-            "period_ms": int,           # 闪烁/呼吸周期；常亮时无意义
-            "duty":      0..255         # 该状态选中颜色的亮度
-        },
-        ...
-    }
-
-只有 5 个「活动状态」可配：model / working / thinking / alert / idle。
-off（会话结束/全灭）固定为全灭，不接受配置，保证「关灯永远能关」。
+本文件仍保留历史状态默认灯效和 state_effects 读取函数，用作旧配置兼容与状态文件未携带
+灯效时的回退；新的 GUI 不再在「基础设置」里提供状态灯效表。
 """
 
 from __future__ import annotations

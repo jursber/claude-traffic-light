@@ -1,14 +1,14 @@
 # -*- mode: python ; coding: utf-8 -*-
 # 用法（在仓库根目录）:
 #   pip install pyinstaller
-#   pyinstaller packaging/pyinstaller/claude_tl.spec
+#   pyinstaller extras/legacy_packaging/pyinstaller/claude_tl.spec
 # 产出 dist/claude-tl/claude-tl.exe（目录模式，便于放 active_agent.json 旁）
 
 import sys
 from pathlib import Path
 
 SPECDIR = Path(SPECPATH).resolve().parent
-ROOT = SPECDIR.parent.parent
+ROOT = SPECDIR.parent.parent.parent
 ENTRY = SPECDIR / "entry.py"
 
 block_cipher = None

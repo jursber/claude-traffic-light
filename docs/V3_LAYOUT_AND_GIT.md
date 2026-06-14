@@ -6,9 +6,10 @@
 |------|------|
 | `src/claude_tl/` | **V3 唯一源码包**：守护进程、状态写入、BLE/串口、切换 agent。打 exe 时**只打这一块**。 |
 | 根目录 `*.py`（如 `daemon_unified.py`） | **薄启动器**：把 `src/` 塞进 `sys.path` 后调用包内 `main()`。兼容旧 hook 路径、VBS `cwd`。 |
-| `tests/` | 手动/冒烟测试，**默认不**打进 PyInstaller。 |
+| `tests/` | 自动回归 + 手动/冒烟测试，**默认不**打进 PyInstaller。 |
 | `extras/legacy_windows/` | 旧 Windows 安装脚本等，**与 exe 无关**。 |
-| `packaging/pyinstaller/` | 打包规格与入口，详见同目录说明。 |
+| `extras/legacy_packaging/` | 旧 PyInstaller 脚手架归档，保留给历史追溯。 |
+| `packaging/` | 当前打包入口：`build_win.ps1` + `vibelight.spec`。 |
 | `arduino/` | ESP32 固件，与 Python 包分离。 |
 | `active_agent.json` | 运行时配置（与仓库根绑定，或通过 `CC_TL_HOME` 重定向）。 |
 
