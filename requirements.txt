@@ -1,6 +1,11 @@
 pyserial>=3.5
+
+# Optional: BLE transport. Serial-only installs do not need this.
 bleak>=0.21.0
+
+# GUI / system tray
 pystray>=0.19.5
 Pillow>=10.0.0
 
-# 开发（pytest）：pip install -e ".[dev]"
+# Development: pip install -e ".[dev]"
+# Full local environment: pip install -e ".[all]"

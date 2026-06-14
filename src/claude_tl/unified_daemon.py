@@ -134,20 +134,41 @@ def read_all_states() -> dict:
             else:
                 ts = 0
             if now - ts < 10:
+                newer_state_exists = False
                 for name in files:
-                    if name.endswith(".tmp") or name == "_global_off":
+                    if name.endswith(".tmp") or name.startswith("_"):
                         continue
                     try:
-                        os.remove(os.path.join(state_dir, name))
+                        if os.path.getmtime(os.path.join(state_dir, name)) > ts:
+                            newer_state_exists = True
+                            break
                     except OSError:
                         pass
-                return {"_global_off": {"state": "off"}}
+                if newer_state_exists:
+                    try:
+                        os.remove(global_off_path)
+                    except OSError:
+                        pass
+                else:
+                    for name in files:
+                        if name.endswith(".tmp") or name.startswith("_"):
+                            continue
+                        try:
+                            os.remove(os.path.join(state_dir, name))
+                        except OSError:
+                            pass
+                    return {"_global_off": {"state": "off"}}
+            else:
+                try:
+                    os.remove(global_off_path)
+                except OSError:
+                    pass
         except (OSError, json.JSONDecodeError):
             pass
 
     # 读取所有 session 状态文件
     for name in files:
-        if name.endswith(".tmp") or name == "_last_session":
+        if name.endswith(".tmp") or name.startswith("_"):
             continue
         path = os.path.join(state_dir, name)
         try:
@@ -423,7 +444,9 @@ def main():
                     pass
             time.sleep(RECONNECT_INTERVAL)
 
-        except BaseException as e:
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except Exception as e:
             log.error("致命异常 (%s):\n%s", type(e).__name__, traceback.format_exc())
             if link:
                 try:

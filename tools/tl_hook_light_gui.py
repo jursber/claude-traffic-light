@@ -75,12 +75,13 @@ _win_detach_console_if_any()
 
 import json
 import os
+import shutil
 import socket
 import subprocess
 import threading
 import time
 from pathlib import Path
-from tkinter import BOTH, LEFT, StringVar, TclError, W, X, messagebox, ttk
+from tkinter import BOTH, LEFT, StringVar, TclError, W, X, filedialog, messagebox, ttk
 import tkinter as tk
 
 _ROOT = Path(__file__).resolve().parents[1]
@@ -126,6 +127,16 @@ from claude_tl.light_effects import (
 # GUI 与 daemon 共用同一配置文件路径（单一真相源）
 CONFIG_PATH = effects_config_path()
 
+AGENT_ORDER = ("claude", "codex", "cursor")
+AGENT_LABELS = {"claude": "Claude", "codex": "Codex", "cursor": "Cursor"}
+AGENT_APP_NAMES = {
+    "claude": ("claude.exe", "claude.cmd", "claude.bat", "claude", "claude-code.exe", "claude-code.cmd"),
+    "codex": ("codex.exe", "codex.cmd", "codex.bat", "codex"),
+    "cursor": ("Cursor.exe", "cursor.exe"),
+}
+PRIORITY_LABELS = tuple(str(i) for i in range(1, 13))
+_COMBOBOX_KEEPALIVE_ATTR = "_vcl_combobox_refs"
+
 _AUTOSTART_DIR = (
     Path(os.environ.get("APPDATA", ""))
     / "Microsoft"
@@ -155,6 +166,198 @@ def _subprocess_no_window_kw() -> dict:
         si.wShowWindow = subprocess.SW_HIDE
         return {"creationflags": _CREATE_NO_WINDOW, "startupinfo": si}
     return {}
+
+
+def _clean_path_text(raw: str) -> str:
+    return raw.strip().strip('"')
+
+
+def _path_name_ok(agent: str, p: Path) -> bool:
+    names = {n.lower() for n in AGENT_APP_NAMES[agent]}
+    return p.name.lower() in names
+
+
+def validate_agent_program_path(agent: str, raw: str) -> tuple[bool, str, str]:
+    """Return (valid, display_message, normalized_path)."""
+    text = _clean_path_text(raw)
+    if not text:
+        return False, "未选择", ""
+    p = Path(text).expanduser()
+    if p.is_file():
+        if _path_name_ok(agent, p):
+            return True, "已校验", str(p)
+        return False, "名称不匹配", str(p)
+    if p.is_dir():
+        for name in AGENT_APP_NAMES[agent]:
+            child = p / name
+            if child.is_file():
+                return True, "已校验", str(p)
+        return False, "目录无程序", str(p)
+    return False, "路径不存在", str(p)
+
+
+def _first_existing_agent_candidate(agent: str) -> str:
+    for name in AGENT_APP_NAMES[agent]:
+        found = shutil.which(name)
+        if found:
+            ok, _msg, norm = validate_agent_program_path(agent, found)
+            if ok:
+                return norm
+
+    home = Path.home()
+    env_paths = {
+        key: Path(value)
+        for key in ("LOCALAPPDATA", "APPDATA", "ProgramFiles", "ProgramFiles(x86)")
+        if (value := os.environ.get(key))
+    }
+    candidates: list[Path] = []
+    if agent == "cursor":
+        local = env_paths.get("LOCALAPPDATA")
+        if local:
+            candidates.extend(
+                [
+                    local / "Programs" / "Cursor" / "Cursor.exe",
+                    local / "Programs" / "cursor" / "Cursor.exe",
+                ]
+            )
+    if agent == "claude":
+        local = env_paths.get("LOCALAPPDATA")
+        if local:
+            candidates.extend(
+                [
+                    local / "Programs" / "Claude" / "Claude.exe",
+                    local / "AnthropicClaude" / "Claude.exe",
+                ]
+            )
+    appdata = env_paths.get("APPDATA")
+    if appdata:
+        for name in AGENT_APP_NAMES[agent]:
+            candidates.append(appdata / "npm" / name)
+    for base in (home / ".local" / "bin", home / "scoop" / "shims"):
+        for name in AGENT_APP_NAMES[agent]:
+            candidates.append(base / name)
+
+    for p in candidates:
+        ok, _msg, norm = validate_agent_program_path(agent, str(p))
+        if ok:
+            return norm
+    return ""
+
+
+def _remember_combobox(owner: tk.Misc, cb: ttk.Combobox) -> ttk.Combobox:
+    refs = getattr(owner, _COMBOBOX_KEEPALIVE_ATTR, None)
+    if refs is None:
+        refs = []
+        setattr(owner, _COMBOBOX_KEEPALIVE_ATTR, refs)
+    refs.append(cb)
+    return cb
+
+
+def _combobox_popdown_window(cb: ttk.Combobox) -> str:
+    return str(cb.tk.call("ttk::combobox::PopdownWindow", str(cb)))
+
+
+def _combobox_popup_is_mapped(cb: ttk.Combobox) -> bool:
+    try:
+        popdown = _combobox_popdown_window(cb)
+        return bool(int(cb.tk.call("winfo", "ismapped", popdown)))
+    except tk.TclError:
+        return False
+
+
+def _bind_popdown_listbox_mousewheel_break(cb: ttk.Combobox) -> None:
+    """Disable wheel handling inside ttk.Combobox popdown listboxes.
+
+    On Windows Tk, wheel events over a combobox popdown can interact badly with
+    the app-wide MouseWheel binding used for Canvas scrolling. We prefer a
+    stable dropdown over wheel scrolling inside that short list.
+    """
+    try:
+        popdown = _combobox_popdown_window(cb)
+    except tk.TclError:
+        return
+    stack = [popdown]
+    seen: set[str] = set()
+    while stack:
+        widget = stack.pop()
+        if widget in seen:
+            continue
+        seen.add(widget)
+        try:
+            cls = str(cb.tk.call("winfo", "class", widget))
+        except tk.TclError:
+            continue
+        if cls == "Listbox":
+            for event_name in ("<MouseWheel>", "<Button-4>", "<Button-5>"):
+                try:
+                    cb.tk.call("bind", widget, event_name, "break")
+                except tk.TclError:
+                    pass
+        try:
+            children = cb.tk.splitlist(cb.tk.call("winfo", "children", widget))
+        except tk.TclError:
+            children = ()
+        stack.extend(str(child) for child in children)
+
+
+def make_combobox(owner: tk.Misc, parent: tk.Misc, **kwargs) -> ttk.Combobox:
+    """Create every ttk.Combobox through one guarded path.
+
+    Keeping a Python-side reference and ignoring mouse-wheel on closed combos avoids
+    Windows Tk popup edge cases inside Canvas/Notebook layouts.
+    """
+    postcommand = kwargs.pop("postcommand", None)
+    cb = ttk.Combobox(parent, **kwargs)
+    _remember_combobox(owner, cb)
+
+    def _ignore_wheel(_event: tk.Event) -> str:
+        return "break"
+
+    def _guard_popdown_after_post() -> None:
+        try:
+            cb.after_idle(lambda: _bind_popdown_listbox_mousewheel_break(cb))
+        except tk.TclError:
+            pass
+
+    def _postcommand() -> None:
+        if callable(postcommand):
+            postcommand()
+        _guard_popdown_after_post()
+
+    def _safe_post(_event: tk.Event) -> None:
+        try:
+            cb.winfo_exists()
+        except tk.TclError:
+            return
+        _guard_popdown_after_post()
+
+    try:
+        cb.configure(postcommand=_postcommand)
+    except tk.TclError:
+        pass
+
+    cb.bind("<MouseWheel>", _ignore_wheel, add="+")
+    cb.bind("<<ComboboxSelected>>", lambda _e: cb.selection_clear(), add="+")
+    cb.bind("<Button-1>", _safe_post, add="+")
+    cb.bind("<Alt-Down>", _safe_post, add="+")
+    cb.bind("<F4>", _safe_post, add="+")
+    return cb
+
+
+def _cleanup_stale_daemon_runtime_files() -> None:
+    try:
+        pid = int(_DAEMON_PID_FILE.read_text(encoding="utf-8").strip())
+    except (OSError, ValueError):
+        pid = 0
+    if pid and pid_alive(pid):
+        return
+    for p in (_DAEMON_PID_FILE, _DAEMON_LOCK_FILE):
+        try:
+            p.unlink()
+        except FileNotFoundError:
+            pass
+        except OSError:
+            pass
 
 
 def _try_free_console_win32() -> None:
@@ -328,6 +531,7 @@ def _clamp_period_ms(v: int, default: int) -> int:
 
 
 _DAEMON_PID_FILE = Path(os.environ.get("LOCALAPPDATA", "")) / "Temp" / "cc_traffic_light_daemon.pid"
+_DAEMON_LOCK_FILE = Path(os.environ.get("LOCALAPPDATA", "")) / "Temp" / "cc_traffic_light_daemon.lock"
 
 
 def _unlink_daemon_pid_file_best_effort() -> None:
@@ -590,17 +794,25 @@ class HookAgentPanel(ttk.Frame):
         yv = tk.BooleanVar(value=False)
         rv = tk.BooleanVar(value=False)
         pv = tk.StringVar(value="6")
-        ttk.Combobox(ctl, textvariable=mv, values=EFFECT_LABELS, width=6, state="readonly").pack(side=LEFT, padx=2)
+        mode_cb = make_combobox(self, ctl, textvariable=mv, values=EFFECT_LABELS, width=6, state="readonly")
+        mode_cb.pack(side=LEFT, padx=2)
         for t, var in (("绿", gv), ("黄", yv), ("红", rv)):
             ttk.Checkbutton(ctl, text=t, variable=var).pack(side=LEFT)
         ttk.Label(ctl, text="优先级").pack(side=LEFT, padx=(8, 2))
-        ttk.Combobox(
-            ctl, textvariable=pv, values=[str(i) for i in range(1, 13)], width=4, state="readonly"
-        ).pack(side=LEFT)
+        prio_cb = make_combobox(self, ctl, textvariable=pv, values=PRIORITY_LABELS, width=4, state="readonly")
+        prio_cb.pack(side=LEFT)
         ttk.Button(ctl, text="应用到本组", command=lambda k=gkey: self._apply_group_to_rows(k)).pack(
             side=LEFT, padx=8
         )
-        self._group_vars[gkey] = {"mode": mv, "g": gv, "y": yv, "r": rv, "prio": pv}
+        self._group_vars[gkey] = {
+            "mode": mv,
+            "g": gv,
+            "y": yv,
+            "r": rv,
+            "prio": pv,
+            "mode_cb": mode_cb,
+            "prio_cb": prio_cb,
+        }
         return row_idx + 2
 
     def _apply_group_to_rows(self, gkey: str) -> None:
@@ -663,20 +875,23 @@ class HookAgentPanel(ttk.Frame):
         ttk.Label(body, text=ev_text, justify=LEFT, anchor="w").grid(
             row=row_idx, column=1, padx=6, pady=3, sticky="ew"
         )
-        ttk.Combobox(
+        eff_cb = make_combobox(
+            self,
             body,
             textvariable=eff,
             values=EFFECT_LABELS,
             width=8,
             state="readonly",
-        ).grid(row=row_idx, column=2, padx=6, pady=3, sticky="ew")
+        )
+        eff_cb.grid(row=row_idx, column=2, padx=6, pady=3, sticky="ew")
         ttk.Checkbutton(body, text="", variable=vg).grid(row=row_idx, column=3, padx=6, pady=3)
         ttk.Checkbutton(body, text="", variable=vy).grid(row=row_idx, column=4, padx=6, pady=3)
         ttk.Checkbutton(body, text="", variable=vr).grid(row=row_idx, column=5, padx=6, pady=3)
-        prio_cb = ttk.Combobox(
+        prio_cb = make_combobox(
+            self,
             body,
             textvariable=prio,
-            values=[str(i) for i in range(1, 13)],
+            values=PRIORITY_LABELS,
             width=4,
             state="readonly",
         )
@@ -687,6 +902,7 @@ class HookAgentPanel(ttk.Frame):
             "zh_label": zh_label,
             "zh_default": ent.zh_default,
             "effect": eff,
+            "effect_cb": eff_cb,
             "g": vg,
             "y": vy,
             "r": vr,
@@ -773,6 +989,11 @@ class TrafficHookLightApp(ttk.Frame):
         self._agent_busy = False
         self._daemon_start_busy = False
         self._agent_var = tk.StringVar(value=str(load_config().get("active", "claude")))
+        self._agent_path_vars = {agent: tk.StringVar(value="") for agent in AGENT_ORDER}
+        self._agent_path_state: dict[str, bool] = {agent: False for agent in AGENT_ORDER}
+        self._agent_path_status: dict[str, ttk.Label] = {}
+        self._agent_radios: dict[str, ttk.Radiobutton] = {}
+        self._agent_tabs: dict[str, ttk.Frame] = {}
         self._status = ttk.Label(self, text="就绪", foreground="gray")
 
         self._daemon_stopped_for_serial = False
@@ -791,6 +1012,7 @@ class TrafficHookLightApp(ttk.Frame):
         nb.add(f1, text="Claude")
         nb.add(f2, text="Codex")
         nb.add(f3, text="Cursor")
+        self._agent_tabs = {"claude": f1, "codex": f2, "cursor": f3}
         nb.bind("<<NotebookTabChanged>>", self._on_notebook_tab)
 
         self._build_basic_tab(f0)
@@ -804,7 +1026,7 @@ class TrafficHookLightApp(ttk.Frame):
         bf = ttk.Frame(self)
         bf.pack(fill=X, pady=4)
         ttk.Button(bf, text="保存全部（基础+Claude+Codex+Cursor）", command=self._save_all).pack(side=LEFT, padx=2)
-        ttk.Button(bf, text="从文件重载全部", command=self._load_all).pack(side=LEFT, padx=2)
+        ttk.Button(bf, text="重置", command=self._reset_to_default).pack(side=LEFT, padx=2)
 
         self._status.pack(fill=X)
 
@@ -815,6 +1037,8 @@ class TrafficHookLightApp(ttk.Frame):
 
     def _global_mousewheel(self, event: tk.Event) -> str | None:
         """滚轮交给指针下（含 winfo_containing）的 ScrollableRows，避免事件落在隐藏 Tab 上。"""
+        if self._any_combobox_popup_open():
+            return "break"
         try:
             my_top = self.winfo_toplevel()
             w = my_top.winfo_containing(event.x_root, event.y_root)
@@ -833,6 +1057,14 @@ class TrafficHookLightApp(ttk.Frame):
                     return None
             cur = getattr(cur, "master", None)
         return None
+
+    def _any_combobox_popup_open(self) -> bool:
+        owners = [self, self._claude_panel, self._codex_panel, self._cursor_panel]
+        for owner in owners:
+            for cb in getattr(owner, _COMBOBOX_KEEPALIVE_ATTR, []):
+                if _combobox_popup_is_mapped(cb):
+                    return True
+        return False
 
     def _on_notebook_tab(self, _event: tk.Event | None = None) -> None:
         for pan in (self._claude_panel, self._codex_panel, self._cursor_panel):
@@ -878,12 +1110,70 @@ class TrafficHookLightApp(ttk.Frame):
             messagebox.showerror("开机启动", str(e))
             self._autostart.set(_autostart_enabled())
 
+    def _refresh_agent_path_state(self, agent: str) -> bool:
+        ok, msg, norm = validate_agent_program_path(agent, self._agent_path_vars[agent].get())
+        self._agent_path_state[agent] = ok
+        if norm:
+            self._agent_path_vars[agent].set(norm)
+        lab = self._agent_path_status.get(agent)
+        if lab is not None:
+            lab.config(text=msg, foreground=("#1a6620" if ok else "#a33"))
+        self._apply_agent_availability()
+        return ok
+
+    def _refresh_all_agent_path_states(self) -> None:
+        for agent in AGENT_ORDER:
+            self._refresh_agent_path_state(agent)
+
+    def _apply_agent_availability(self) -> None:
+        current_tab = None
+        try:
+            current_tab = self._nb.select()
+        except tk.TclError:
+            pass
+        for agent in AGENT_ORDER:
+            enabled = bool(self._agent_path_state.get(agent))
+            rb = self._agent_radios.get(agent)
+            if rb is not None:
+                rb.configure(state=(tk.NORMAL if enabled else tk.DISABLED))
+            tab = self._agent_tabs.get(agent)
+            if tab is not None:
+                self._nb.tab(tab, state=("normal" if enabled else "disabled"))
+                if not enabled and current_tab == str(tab):
+                    self._nb.select(0)
+
+    def _browse_agent_path(self, agent: str) -> None:
+        suffixes = sorted({Path(name).suffix for name in AGENT_APP_NAMES[agent] if Path(name).suffix})
+        pattern = " ".join(f"*{suffix}" for suffix in suffixes) or "*.*"
+        chosen = filedialog.askopenfilename(
+            title=f"选择 {AGENT_LABELS[agent]} 程序位置",
+            filetypes=[("Program files", pattern), ("All files", "*.*")],
+        )
+        if not chosen:
+            return
+        self._agent_path_vars[agent].set(chosen)
+        self._refresh_agent_path_state(agent)
+
+    def _find_agent_path(self, agent: str) -> None:
+        found = _first_existing_agent_candidate(agent)
+        if found:
+            self._agent_path_vars[agent].set(found)
+            self._refresh_agent_path_state(agent)
+            self._log(f"已找到 {AGENT_LABELS[agent]} 程序位置：{found}")
+            return
+        self._refresh_agent_path_state(agent)
+        messagebox.showwarning(
+            "程序位置",
+            f"未自动找到 {AGENT_LABELS[agent]}。请点击“浏览”手动选择对应程序文件。",
+        )
+
     def _on_agent_change(self) -> None:
         if self._agent_busy:
             return
         want = self._agent_var.get()
-        if load_config().get("active", "claude") == want:
-            self._log(f"当前已是 {want}")
+        if not self._agent_path_state.get(want):
+            self._agent_var.set(str(load_config().get("active", "claude")))
+            messagebox.showwarning("Agent 切换", f"请先在“程序位置”中选择并校验 {AGENT_LABELS.get(want, want)}。")
             return
         self._start_agent_switch(want)
 
@@ -927,27 +1217,33 @@ class TrafficHookLightApp(ttk.Frame):
         ag_fr = ttk.Frame(row1)
         ag_fr.pack(side=LEFT)
         ttk.Label(ag_fr, text="Agent").pack(side=LEFT, padx=(0, 4))
-        ttk.Radiobutton(
+        rb = ttk.Radiobutton(
             ag_fr,
             text="Claude",
             variable=self._agent_var,
             value="claude",
             command=self._on_agent_change,
-        ).pack(side=LEFT)
-        ttk.Radiobutton(
+        )
+        rb.pack(side=LEFT)
+        self._agent_radios["claude"] = rb
+        rb = ttk.Radiobutton(
             ag_fr,
             text="Codex",
             variable=self._agent_var,
             value="codex",
             command=self._on_agent_change,
-        ).pack(side=LEFT, padx=4)
-        ttk.Radiobutton(
+        )
+        rb.pack(side=LEFT, padx=4)
+        self._agent_radios["codex"] = rb
+        rb = ttk.Radiobutton(
             ag_fr,
             text="Cursor",
             variable=self._agent_var,
             value="cursor",
             command=self._on_agent_change,
-        ).pack(side=LEFT, padx=4)
+        )
+        rb.pack(side=LEFT, padx=4)
+        self._agent_radios["cursor"] = rb
         self._hw_indicator = ttk.Label(row1, text="检测中…", justify=LEFT)
         self._hw_indicator.pack(side=LEFT, padx=8, fill=X, expand=True)
 
@@ -955,7 +1251,7 @@ class TrafficHookLightApp(ttk.Frame):
         row2.pack(fill=X, pady=2)
         ttk.Label(row2, text="端口").pack(side=LEFT)
         self._port_var = StringVar()
-        self._port_combo = ttk.Combobox(row2, textvariable=self._port_var, width=10)
+        self._port_combo = make_combobox(self, row2, textvariable=self._port_var, width=10)
         self._port_combo.pack(side=LEFT, padx=4)
         ttk.Button(row2, text="刷新", command=self._on_refresh_clicked).pack(side=LEFT)
         ttk.Button(row2, text="启动灯控", command=self._on_start_daemon_clicked).pack(side=LEFT, padx=(4, 0))
@@ -965,6 +1261,29 @@ class TrafficHookLightApp(ttk.Frame):
             variable=self._autostart,
             command=self._on_autostart_toggle,
         ).pack(side=LEFT, padx=(16, 4))
+
+        path_lf = ttk.LabelFrame(f, text="程序位置", padding=6)
+        path_lf.pack(fill=X, pady=(6, 2))
+        ttk.Label(
+            path_lf,
+            text="选择并校验 Claude / Codex / Cursor 的程序位置。校验通过后，对应 Agent 选项和页签才会开放。",
+            foreground="#555",
+            wraplength=900,
+            justify=LEFT,
+        ).pack(fill=X, anchor=W, pady=(0, 4))
+        for agent in AGENT_ORDER:
+            row = ttk.Frame(path_lf)
+            row.pack(fill=X, pady=2)
+            ttk.Label(row, text=AGENT_LABELS[agent], width=8).pack(side=LEFT)
+            ent = ttk.Entry(row, textvariable=self._agent_path_vars[agent], width=58)
+            ent.pack(side=LEFT, fill=X, expand=True, padx=(0, 4))
+            ent.bind("<FocusOut>", lambda _e, a=agent: self._refresh_agent_path_state(a))
+            ent.bind("<Return>", lambda _e, a=agent: self._refresh_agent_path_state(a))
+            ttk.Button(row, text="浏览", command=lambda a=agent: self._browse_agent_path(a)).pack(side=LEFT, padx=2)
+            ttk.Button(row, text="查找", command=lambda a=agent: self._find_agent_path(a)).pack(side=LEFT, padx=2)
+            lab = ttk.Label(row, text="未选择", width=10, foreground="#a33")
+            lab.pack(side=LEFT, padx=(6, 0))
+            self._agent_path_status[agent] = lab
 
         test_lf = ttk.LabelFrame(
             f,
@@ -1030,7 +1349,7 @@ class TrafficHookLightApp(ttk.Frame):
         self._test_disable_children.append(self._btn_test_send)
 
         r3 = ttk.LabelFrame(f, text="亮度与周期（扩展帧；与后续 hook 驱动共用数值）", padding=6)
-        r3.pack(fill=X, pady=4)
+        r3.pack(fill=X, pady=4, before=path_lf)
 
         def row_scale(parent: ttk.Frame, label: str, var: tk.IntVar) -> None:
             fr = ttk.Frame(parent)
@@ -1063,18 +1382,12 @@ class TrafficHookLightApp(ttk.Frame):
         self._spin_breath = ttk.Spinbox(pr, from_=0, to=60000, textvariable=self._breath_period, width=8)
         self._spin_breath.pack(side=LEFT, padx=4)
 
-        se_hint = ttk.Label(
-            f,
-            text=(
-                "灯效（模式/颜色/优先级）现在分别在上方 Claude / Codex / Cursor 标签页里按「状态组」配置；"
-                "本页只保留全局的「闪烁/呼吸周期」与「绿/黄/红亮度」。改动后点窗口底部「保存全部」即热生效。"
-            ),
-            foreground="#555",
-            wraplength=900,
-            justify=LEFT,
+        usage_text = (
+            "切换任一Agent后，后台配置即刻生效，通常无需关闭当前窗口或重启灯控程序。"
+            "若灯光未按预设配置运行，多为软件未重载钩子（hooks），新建会话或重启该 IDE 通常可解决。"
+            " 点击「连接」调试灯光后接口被接管，程序无法正常指示真实状态；若持续弹出访问拒绝提示，先行关闭 Arduino、串口调试助手等占用端口的程序，问题依旧无法排查时，重新插拔 USB 设备即可释放串口。\n"
+            "项目地址  jursber/claude-traffic-light https://github.com/jursber/claude-traffic-light"
         )
-        se_hint.pack(fill=X, anchor=W, pady=(6, 0))
-
         foot_tech = (
             "【技术说明】active_agent.json 决定当前由哪套 IDE 的 hooks 把状态写入「哪一个」Temp 子目录；"
             "unified_daemon 每次合并灯态前都会重新读该文件，因此切换 Agent 后，灯控会立刻改读新目录，无需重启本 GUI 或守护进程。"
@@ -1091,7 +1404,7 @@ class TrafficHookLightApp(ttk.Frame):
         lf_foot.pack(fill=BOTH, expand=False, pady=(10, 0))
         foot_box = tk.Text(
             lf_foot,
-            height=10,
+            height=3,
             wrap="word",
             font=("Microsoft YaHei UI", 10) if sys.platform == "win32" else ("TkDefaultFont", 10),
             relief="flat",
@@ -1102,7 +1415,7 @@ class TrafficHookLightApp(ttk.Frame):
             fg="#1a1a1a",
         )
         foot_box.pack(fill=BOTH, expand=True)
-        foot_box.insert("1.0", foot_tech + "\n\n" + foot_plain)
+        foot_box.insert("1.0", usage_text)
         foot_box.configure(state=tk.DISABLED)
 
         self._apply_test_region_state()
@@ -1454,6 +1767,7 @@ class TrafficHookLightApp(ttk.Frame):
             "breath_period_ms": self._parse_nonneg_int(self._breath_period.get(), 2000),
             "test_mode": bool(self._test_mode.get()),
             "boot_autostart_daemon": bool(self._autostart.get()),
+            "agent_paths": {agent: self._agent_path_vars[agent].get().strip() for agent in AGENT_ORDER},
         }
         doc["claude"] = {"rows": self._claude_panel.collect()}
         doc["codex"] = {"rows": self._codex_panel.collect()}
@@ -1470,12 +1784,28 @@ class TrafficHookLightApp(ttk.Frame):
             "以便把带 --event 的 hook 重新写入该 IDE 的 hooks 配置。",
         )
 
-    def _load_all(self) -> None:
-        try:
-            with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-                doc = json.load(f)
-        except (OSError, json.JSONDecodeError):
-            doc = {}
+    def _reset_to_default(self) -> None:
+        if not messagebox.askyesno(
+            "重置配置",
+            "此操作会全部重置用户自定义的基础设置、程序位置和各 Agent 灯效配置。\n\n是否继续？",
+        ):
+            return
+        doc = default_tl_hook_light_gui_document()
+        CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+            json.dump(doc, f, indent=2, ensure_ascii=False)
+        self._load_all(doc)
+        messagebox.showinfo("重置配置", f"已重置为内置原始配置并写入：\n{CONFIG_PATH}")
+        self._log("已重置为内置原始配置")
+
+    def _load_all(self, source_doc: dict | None = None) -> None:
+        doc = source_doc
+        if doc is None:
+            try:
+                with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+                    doc = json.load(f)
+            except (OSError, json.JSONDecodeError):
+                doc = {}
         if not doc:
             doc = default_tl_hook_light_gui_document()
         b = doc.get("basic") or {}
@@ -1488,6 +1818,10 @@ class TrafficHookLightApp(ttk.Frame):
         self._breath_period.set(str(int(b.get("breath_period_ms", 2000))))
         if "test_mode" in b:
             self._test_mode.set(bool(b["test_mode"]))
+        agent_paths = b.get("agent_paths") or {}
+        if isinstance(agent_paths, dict):
+            for agent in AGENT_ORDER:
+                self._agent_path_vars[agent].set(str(agent_paths.get(agent, "")))
         if "boot_autostart_daemon" in b:
             want = bool(b["boot_autostart_daemon"])
             if want != _autostart_enabled():
@@ -1513,6 +1847,7 @@ class TrafficHookLightApp(ttk.Frame):
         self._codex_panel.apply_rows((doc.get("codex") or {}).get("rows"))
         self._cursor_panel.apply_rows((doc.get("cursor") or {}).get("rows"))
         self._agent_var.set(str(load_config().get("active", "claude")))
+        self._refresh_all_agent_path_states()
         self._sync_connection_status_text()
         self._on_refresh_clicked(initial=True)
         self._log(f"已加载 {CONFIG_PATH}" if doc else "无 tl_hook_light_gui.json，使用默认；已同步 active_agent")
@@ -1542,6 +1877,7 @@ def _install_tray_win32_double_click_open(root: tk.Tk, show_window) -> None:
 
 
 def main() -> None:
+    _cleanup_stale_daemon_runtime_files()
     try:
         import pystray
         from PIL import Image, ImageTk
@@ -1555,12 +1891,12 @@ def main() -> None:
 
             ctypes.windll.user32.MessageBoxW(
                 None,
-                "VibeCodingLight 已在运行。\n请在系统托盘或任务栏打开现有窗口。",
+                "VibeCodingLight 已在运行，不能启动多个实例。\n请在系统托盘或任务栏打开现有窗口。",
                 "VibeCodingLight",
                 0x00000040,
             )
         else:
-            print("VibeCodingLight 已在运行。", file=sys.stderr)
+            print("VibeCodingLight 已在运行，不能启动多个实例。", file=sys.stderr)
         raise SystemExit(0)
 
     _try_free_console_win32()
@@ -1624,17 +1960,17 @@ def main() -> None:
     threading.Thread(target=icon.run, daemon=True).start()
     root.protocol("WM_DELETE_WINDOW", hide_to_tray)
 
-    TrafficHookLightApp(root)
-    root.mainloop()
-
-    ic = tray_holder.get("icon")
-    if ic is not None:
-        try:
-            ic.stop()  # type: ignore[union-attr]
-        except Exception:
-            pass
-
-    _single_instance_release()
+    try:
+        TrafficHookLightApp(root)
+        root.mainloop()
+    finally:
+        ic = tray_holder.get("icon")
+        if ic is not None:
+            try:
+                ic.stop()  # type: ignore[union-attr]
+            except Exception:
+                pass
+        _single_instance_release()
 
 
 if __name__ == "__main__":

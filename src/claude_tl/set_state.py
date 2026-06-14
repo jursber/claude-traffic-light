@@ -22,6 +22,15 @@ import time
 
 from claude_tl.config import COMMANDS, STATE_DIR
 
+DEPRECATED_NOTICE = (
+    "警告：set_state.py 是 V1/V2 经典入口，V3 推荐使用 set_state_unified.py "
+    "或 VibeLight.exe set-state-unified。"
+)
+
+
+def _warn_deprecated() -> None:
+    print(DEPRECATED_NOTICE, file=sys.stderr)
+
 # ============================================================
 # 需要显示"红灯闪烁"的工具列表
 # ============================================================
@@ -65,6 +74,7 @@ def set_state(state: str, session_id: str = "default") -> bool:
 
 
 def main():
+    _warn_deprecated()
     # 至少需要一个参数：状态名
     if len(sys.argv) < 2:
         print(f"用法: {sys.argv[0]} <状态名|auto>", file=sys.stderr)

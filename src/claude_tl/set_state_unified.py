@@ -96,6 +96,8 @@ def set_state(state: str, session_id: str = "default", light: dict | None = None
     """
     if state not in COMMANDS:
         return False
+    if not session_id or session_id != os.path.basename(session_id) or "\\" in session_id or "/" in session_id:
+        return False
 
     state_dir = get_state_dir()
     os.makedirs(state_dir, exist_ok=True)

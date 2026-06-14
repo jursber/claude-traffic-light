@@ -20,6 +20,8 @@ from claude_tl.config import COMMANDS, STATE_DIR, PRIORITY
 from claude_tl.proc_util import pid_alive
 from claude_tl.tl_transport import send_cmd as transport_send, transport_mode, wait_for_transport
 
+DEPRECATED_NOTICE = "警告：daemon.py 是经典守护进程，V3 推荐使用 daemon_unified.py。"
+
 # ============================================================
 # 日志配置
 # ============================================================
@@ -79,7 +81,7 @@ def read_all_states() -> dict:
                 ts = 0
             if now - ts < 10:
                 for name in files:
-                    if name.endswith(".tmp") or name == "_global_off":
+                    if name.endswith(".tmp") or name.startswith("_"):
                         continue
                     try:
                         os.remove(os.path.join(STATE_DIR, name))
@@ -172,6 +174,7 @@ def is_another_running():
 
 def main():
     """主入口：外层无限重启循环，保证进程永远不退出。"""
+    print(DEPRECATED_NOTICE, file=sys.stderr)
 
     # 单实例检查：如果已有 daemon 在运行，直接退出
     if is_another_running():
@@ -205,8 +208,9 @@ def main():
                     pass
             time.sleep(RECONNECT_INTERVAL)
 
-        except BaseException as e:
-            # BaseException 捕获包括 SystemExit、KeyboardInterrupt 在内的一切异常
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except Exception as e:
             log.error("致命异常 (%s):\n%s", type(e).__name__, traceback.format_exc())
             if link:
                 try:

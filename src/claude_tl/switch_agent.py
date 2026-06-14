@@ -11,6 +11,7 @@ Agent 切换脚本 - 在 Claude Code、OpenAI Codex、Cursor 之间切换
 import json
 import os
 import sys
+import time
 
 from claude_tl._paths import active_agent_path, repo_root
 from claude_tl.hook_light_catalog import (
@@ -118,8 +119,15 @@ def load_config():
 def save_config(config):
     """保存配置文件"""
     os.makedirs(os.path.dirname(CONFIG_FILE) or ".", exist_ok=True)
-    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+    tmp = CONFIG_FILE + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
         json.dump(config, f, indent=2, ensure_ascii=False)
+        f.flush()
+        try:
+            os.fsync(f.fileno())
+        except OSError:
+            pass
+    os.replace(tmp, CONFIG_FILE)
 
 
 def load_json_file(path):
@@ -134,8 +142,45 @@ def load_json_file(path):
 def save_json_file(path, data):
     """写入 JSON 配置文件。"""
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
+        f.flush()
+        try:
+            os.fsync(f.fileno())
+        except OSError:
+            pass
+    os.replace(tmp, path)
+
+
+def _state_dir_for_agent(config: dict, agent: str) -> str:
+    agents = config.get("agents") if isinstance(config, dict) else {}
+    state_dir = ""
+    if isinstance(agents, dict):
+        agent_cfg = agents.get(agent)
+        if isinstance(agent_cfg, dict):
+            state_dir = str(agent_cfg.get("state_dir") or "")
+    if not state_dir:
+        state_dir = "cc_tl_states"
+    return os.path.join(os.environ.get("LOCALAPPDATA", ""), "Temp", state_dir)
+
+
+def reset_agent_state_dir(config: dict, agent: str) -> None:
+    """Clear stale runtime states after switching agent so old sessions cannot drive the lamp."""
+    state_dir = _state_dir_for_agent(config, agent)
+    os.makedirs(state_dir, exist_ok=True)
+    for name in os.listdir(state_dir):
+        if name.endswith(".tmp") or name.startswith("_"):
+            continue
+        try:
+            os.remove(os.path.join(state_dir, name))
+        except OSError:
+            pass
+    off_path = os.path.join(state_dir, "_global_off")
+    tmp = off_path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump({"state": "off", "ts": time.time()}, f)
+    os.replace(tmp, off_path)
 
 
 def remove_traffic_light_hooks(config):
@@ -294,6 +339,7 @@ def switch_agent(agent):
 
     config["active"] = agent
     save_config(config)
+    reset_agent_state_dir(config, agent)
 
     _safe_print(f"已切换到 {agent}")
     return True

@@ -198,9 +198,9 @@ CURSOR_HOOK_CATALOG: tuple[HookCatalogEntry, ...] = (
 
 # set_state_unified 首参 → GUI 默认灯效（与 V2.0 `config.COMMANDS` + `PRIORITY` 语义对齐）
 _STATE_TO_GUI: dict[str, tuple[str, int, str]] = {
-    "prompt": ("blink", MASK_G, "model"),
+    "prompt": ("breath", MASK_Y, "thinking"),
     "auto": ("solid", MASK_G, "working"),
-    "thinking": ("blink", MASK_Y, "thinking"),
+    "thinking": ("breath", MASK_Y, "thinking"),
     "working": ("solid", MASK_G, "working"),
     "alert": ("blink", MASK_R, "alert"),
     "idle": ("solid", MASK_R, "idle"),
@@ -256,7 +256,7 @@ def default_tl_hook_light_gui_document() -> dict[str, Any]:
             "duty_y": 255,
             "duty_r": 255,
             "blink_period_ms": 800,
-            "breath_period_ms": 2000,
+            "breath_period_ms": 3000,
             "test_mode": False,
             "boot_autostart_daemon": True,
         },

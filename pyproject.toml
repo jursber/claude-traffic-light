@@ -10,11 +10,18 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "pyserial>=3.5",
-    "bleak>=0.21.0",
 ]
 
 [project.optional-dependencies]
+ble = ["bleak>=0.21.0"]
+gui = ["pystray>=0.19.5", "Pillow>=10.0.0"]
 dev = ["pytest>=7.0"]
+all = [
+    "bleak>=0.21.0",
+    "pystray>=0.19.5",
+    "Pillow>=10.0.0",
+    "pytest>=7.0",
+]
 
 [project.scripts]
 claude-tl = "claude_tl.__main__:main"

@@ -17,6 +17,8 @@ import subprocess
 import ctypes
 import time
 
+DEPRECATED_NOTICE = "警告：start_daemon.py 是经典启动器，V3 推荐使用 start_daemon_unified.py。"
+
 # 守护进程的 PID 文件路径
 PID_FILE = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Temp", "cc_traffic_light_daemon.pid")
 
@@ -66,6 +68,7 @@ def start_via_task():
 
 
 def main():
+    print(DEPRECATED_NOTICE, file=sys.stderr)
     # 已经在运行，直接返回
     if is_daemon_running():
         print("守护进程已在运行。")

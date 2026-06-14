@@ -25,6 +25,7 @@ from claude_tl.vibelight.protocol import (
     MODE_OFF,
     MODE_SOLID,
     MODE_SYNC_BLINK,
+    PERIOD_MIN_MS,
     build_set_lighting_frame,
 )
 
@@ -38,11 +39,11 @@ MODE_NAME_TO_CODE: dict[str, int] = {
 MODE_CODE_TO_NAME: dict[int, str] = {v: k for k, v in MODE_NAME_TO_CODE.items()}
 
 # 默认灯效：与历史单字符 COMMANDS 行为对齐
-#   model=绿闪 / working=绿常亮 / thinking=黄闪 / alert=红闪 / idle=红常亮
+#   model=绿闪 / working=绿常亮 / thinking=黄呼吸 / alert=红闪 / idle=红常亮
 DEFAULT_STATE_EFFECTS: dict[str, dict] = {
     "model": {"mode": "blink", "mask": MASK_G, "period_ms": 800, "duty": 255},
     "working": {"mode": "solid", "mask": MASK_G, "period_ms": 1000, "duty": 255},
-    "thinking": {"mode": "blink", "mask": MASK_Y, "period_ms": 800, "duty": 255},
+    "thinking": {"mode": "breath", "mask": MASK_Y, "period_ms": 3000, "duty": 255},
     "alert": {"mode": "blink", "mask": MASK_R, "period_ms": 500, "duty": 255},
     "idle": {"mode": "solid", "mask": MASK_R, "period_ms": 1000, "duty": 255},
 }
@@ -80,7 +81,7 @@ def _sanitize_effect(state: str, raw: dict) -> dict:
     except (TypeError, ValueError):
         pass
     try:
-        base["period_ms"] = max(0, int(raw.get("period_ms", base["period_ms"])))
+        base["period_ms"] = max(PERIOD_MIN_MS, int(raw.get("period_ms", base["period_ms"])))
     except (TypeError, ValueError):
         pass
     try:
