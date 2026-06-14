@@ -1,22 +1,43 @@
 """
-Agent 切换脚本 - 在 Claude Code 和 OpenAI Codex 之间切换
+Agent 切换脚本 - 在 Claude Code、OpenAI Codex、Cursor 之间切换
 
 用法：
   python switch_agent.py claude   # 切换到 Claude Code
   python switch_agent.py codex    # 切换到 OpenAI Codex
+  python switch_agent.py cursor   # 切换到 Cursor（~/.cursor/hooks.json）
   python switch_agent.py status   # 查看当前状态
 """
 
+import json
 import os
 import sys
-import json
 
 from claude_tl._paths import active_agent_path, repo_root
-from claude_tl.hook_light_catalog import iter_claude_wired_hook_groups, iter_codex_wired_hook_groups
+from claude_tl.hook_light_catalog import (
+    iter_claude_wired_hook_groups,
+    iter_codex_wired_hook_groups,
+    iter_cursor_wired_hook_items,
+)
 
 CONFIG_FILE = str(active_agent_path())
 CC_HOOKS_FILE = os.path.join(os.path.expanduser("~"), ".claude", "settings.json")
 CODEX_HOOKS_FILE = os.path.join(os.path.expanduser("~"), ".codex", "hooks.json")
+CURSOR_HOOKS_FILE = os.path.join(os.path.expanduser("~"), ".cursor", "hooks.json")
+
+
+def _safe_print(msg: str) -> None:
+    """
+    pythonw / FreeConsole 后 sys.stdout 可能指向无效控制台句柄，后台线程里 print 会触发 WinError 6。
+    GUI 通过线程调用 switch_agent 时必须避免裸 print。
+    """
+    try:
+        out = getattr(sys, "stdout", None)
+        if out is None:
+            return
+        out.write(msg + ("\n" if not msg.endswith("\n") else ""))
+        out.flush()
+    except (OSError, AttributeError, TypeError):
+        pass
 
 
 def hook_roots_normalized():
@@ -28,29 +49,43 @@ def hook_roots_normalized():
     return roots
 
 
-def hook_command(script: str, state: str) -> str:
+def hook_command(script: str, state: str, *extra: str) -> str:
     """
-    生成红绿灯 hook 命令：调用仓库根目录下的启动器 .py（薄封装），
-    以便在未 pip install 时也能通过 PYTHONPATH=src 的根 shim 工作。
+    生成红绿灯 hook 命令。
+
+    - 开发模式：调用仓库根目录下的启动器 .py（薄封装），用当前解释器绝对路径
+      （或 CC_TL_PYTHON），避免 IDE 子进程里找不到裸 `python` 导致 hook 静默失败。
+    - 打包模式(sys.frozen)：调用打包出的 exe 自身 + 子命令(如 `VibeLight.exe set-state-unified auto`)，
+      不依赖目标机的 Python 与 .py 源文件。
+    集中在 launcher.app_command_str 里处理两种形态，见 claude_tl/launcher.py。
+
+    extra 用于追加可选参数（如 `--event <事件名>`，让 set_state_unified 能按
+    (agent, event) 查这个 hook 在三标签页里单独配的灯效）。
     """
-    root = os.environ.get("CC_TL_REPO_ROOT", str(repo_root()))
-    script_path = os.path.join(root, script).replace("\\", "/")
-    base = f'python "{script_path}"'
-    return f"{base} {state}" if state else base
+    from claude_tl.launcher import app_command_str
+
+    return app_command_str(script, state, *extra)
 
 
 def command_hook(command, timeout=5):
-    """生成 command hook 配置。"""
-    return {
+    """生成 command hook 配置（Claude / Codex：嵌套 matcher + hooks 列表）。"""
+    from claude_tl.launcher import is_frozen
+
+    hook = {
         "type": "command",
         "command": command,
-        "shell": "powershell",
         "timeout": timeout,
     }
+    if not is_frozen():
+        # 开发模式：命令是 `python xxx.py`，而 PowerShell 常不把 hook 的 stdin 传给子进程
+        # → set_state_unified 读不到 session_id 不写灯。用 bash(Git for Windows 即可)绕开。
+        # 打包模式：命令直接是 exe，IDE 会把 stdin 直接 pipe 给它，无需 bash，也就不再依赖 Git。
+        hook["shell"] = "bash"
+    return hook
 
 
 def hook_group(command, matcher="", timeout=5):
-    """生成单个 matcher 的 hook 分组。"""
+    """生成单个 matcher 的 hook 分组（Claude / Codex）。"""
     return {
         "matcher": matcher,
         "hooks": [command_hook(command, timeout)],
@@ -112,7 +147,7 @@ def save_json_file(path, data):
 
 
 def remove_traffic_light_hooks(config):
-    """只移除红绿灯自己的 hooks，保留用户已有的其它 hooks。"""
+    """只移除红绿灯自己的 hooks，保留用户已有的其它 hooks（Claude / Codex 嵌套结构）。"""
     hooks = config.get("hooks")
     if not isinstance(hooks, dict):
         return
@@ -148,12 +183,50 @@ def remove_traffic_light_hooks(config):
         config.pop("hooks", None)
 
 
+def remove_traffic_light_hooks_cursor(config):
+    """移除 Cursor `hooks.json` 中的红绿灯项（扁平 `{ command, ... }` 列表）。"""
+    hooks = config.get("hooks")
+    if not isinstance(hooks, dict):
+        return
+
+    for event_name in list(hooks.keys()):
+        items = hooks.get(event_name)
+        if not isinstance(items, list):
+            continue
+        kept = []
+        for item in items:
+            if not isinstance(item, dict):
+                kept.append(item)
+                continue
+            if is_traffic_light_hook(item):
+                continue
+            kept.append(item)
+        if kept:
+            hooks[event_name] = kept
+        else:
+            del hooks[event_name]
+
+    if not hooks:
+        config.pop("hooks", None)
+
+
 def add_hook_groups(config, hook_groups):
-    """追加红绿灯 hooks。调用前会先清理旧的红绿灯 hooks。"""
+    """追加红绿灯 hooks。调用前会先清理旧的红绿灯 hooks（Claude / Codex）。"""
     remove_traffic_light_hooks(config)
     hooks = config.setdefault("hooks", {})
     for event_name, groups in hook_groups.items():
         hooks.setdefault(event_name, []).extend(groups)
+
+
+def add_cursor_hook_items(config, hook_items_by_event: dict):
+    """追加 Cursor 扁平 hooks；调用前会先清理旧的红绿灯项。"""
+    remove_traffic_light_hooks_cursor(config)
+    if not isinstance(config, dict):
+        return
+    config.setdefault("version", 1)
+    hooks = config.setdefault("hooks", {})
+    for event_name, items in hook_items_by_event.items():
+        hooks.setdefault(event_name, []).extend(items)
 
 
 def claude_hook_groups():
@@ -164,6 +237,11 @@ def claude_hook_groups():
 def codex_hook_groups():
     """Codex 的红绿灯 hooks（由 hook_light_catalog 声明）。"""
     return iter_codex_wired_hook_groups(hook_command, hook_group)
+
+
+def cursor_hook_items():
+    """Cursor 的红绿灯 hooks（扁平列表项，见 Cursor 文档 hooks.json）。"""
+    return iter_cursor_wired_hook_items(hook_command)
 
 
 def set_claude_hooks(enable):
@@ -186,12 +264,25 @@ def set_codex_hooks(enable):
     save_json_file(CODEX_HOOKS_FILE, config)
 
 
+def set_cursor_hooks(enable):
+    """启用或禁用 Cursor 的 traffic light hooks（用户级 ~/.cursor/hooks.json）。"""
+    config = load_json_file(CURSOR_HOOKS_FILE)
+    if not isinstance(config, dict):
+        config = {}
+    if enable:
+        add_cursor_hook_items(config, cursor_hook_items())
+    else:
+        remove_traffic_light_hooks_cursor(config)
+    config.setdefault("version", 1)
+    save_json_file(CURSOR_HOOKS_FILE, config)
+
+
 def switch_agent(agent):
     """切换到指定的 agent。"""
     config = load_config()
 
-    if agent not in ["claude", "codex"]:
-        print(f"无效的 agent: {agent}，支持的值: claude, codex")
+    if agent not in ["claude", "codex", "cursor"]:
+        _safe_print(f"无效的 agent: {agent}，支持的值: claude, codex, cursor")
         return False
 
     current = config.get("active", "claude")
@@ -199,16 +290,20 @@ def switch_agent(agent):
         set_claude_hooks(False)
     elif current == "codex":
         set_codex_hooks(False)
+    elif current == "cursor":
+        set_cursor_hooks(False)
 
     if agent == "claude":
         set_claude_hooks(True)
     elif agent == "codex":
         set_codex_hooks(True)
+    elif agent == "cursor":
+        set_cursor_hooks(True)
 
     config["active"] = agent
     save_config(config)
 
-    print(f"已切换到 {agent}")
+    _safe_print(f"已切换到 {agent}")
     return True
 
 
@@ -218,29 +313,30 @@ def show_status():
     active = config.get("active", "claude")
     agents = config.get("agents", {})
 
-    print(f"当前激活的 agent: {active}")
-    print("Agent 配置:")
+    _safe_print(f"当前激活的 agent: {active}")
+    _safe_print("Agent 配置:")
     for name, agent_config in agents.items():
         status = "ACTIVE 激活" if name == active else "  未激活"
-        print(f"  {status} {name}: {agent_config.get('name', name)}")
+        _safe_print(f"  {status} {name}: {agent_config.get('name', name)}")
 
 
 def main():
     if len(sys.argv) < 2:
-        print("用法:")
-        print("  python switch_agent.py claude   # 切换到 Claude Code")
-        print("  python switch_agent.py codex    # 切换到 OpenAI Codex")
-        print("  python switch_agent.py status   # 查看当前状态")
+        _safe_print("用法:")
+        _safe_print("  python switch_agent.py claude   # 切换到 Claude Code")
+        _safe_print("  python switch_agent.py codex    # 切换到 OpenAI Codex")
+        _safe_print("  python switch_agent.py cursor   # 切换到 Cursor")
+        _safe_print("  python switch_agent.py status   # 查看当前状态")
         sys.exit(1)
 
     action = sys.argv[1]
 
     if action == "status":
         show_status()
-    elif action in ["claude", "codex"]:
+    elif action in ["claude", "codex", "cursor"]:
         switch_agent(action)
     else:
-        print(f"无效的操作: {action}")
+        _safe_print(f"无效的操作: {action}")
         sys.exit(1)
 
 

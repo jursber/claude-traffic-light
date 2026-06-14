@@ -9,6 +9,7 @@ import ctypes
 import os
 import subprocess
 import sys
+from pathlib import Path
 
 from claude_tl._paths import repo_root
 
@@ -71,10 +72,12 @@ def start_daemon():
         return True
 
     try:
-        pythonw = sys.executable.replace("python.exe", "pythonw.exe")
-        cwd = str(repo_root())
+        from claude_tl.launcher import daemon_spawn_argv, is_frozen
+
+        argv = daemon_spawn_argv()
+        cwd = str(Path(sys.executable).resolve().parent) if is_frozen() else str(repo_root())
         subprocess.Popen(
-            [pythonw, daemon_script_path()],
+            argv,
             creationflags=subprocess.CREATE_NO_WINDOW,
             cwd=cwd,
         )

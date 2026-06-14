@@ -1,5 +1,5 @@
 """
-统一守护进程 - 支持 Claude Code 和 OpenAI Codex
+统一守护进程 - 支持 Claude Code、OpenAI Codex 与 Cursor
 
 功能：
   1. 根据 active_agent.json 配置确定当前激活的 agent
@@ -24,7 +24,14 @@ import msvcrt
 
 from claude_tl._paths import active_agent_path
 from claude_tl.config import COMMANDS, PRIORITY
-from claude_tl.tl_transport import send_cmd as transport_send, transport_mode, wait_for_transport
+from claude_tl.gui_proto_ipc import gui_proto_request_path
+from claude_tl import light_effects as le
+from claude_tl.light_effects import (
+    config_mtime as effects_config_mtime,
+    config_path as effects_config_path,
+)
+from claude_tl.proc_util import pid_alive
+from claude_tl.tl_transport import transport_mode, wait_for_transport
 
 # ============================================================
 # 日志配置
@@ -49,6 +56,12 @@ ERROR_RETRY_INTERVAL = 1
 ACTIVE_STATE_TTL = 3600  # 1 hour
 ACTIVE_STATES = {"model", "working", "thinking"}
 STATE_FILE_TTL = 1800  # 30 分钟
+
+# 「活动态」最短显示时间：working/thinking/model/alert 在 agent 干活时常快速交替，
+# 不做保护会一闪而过、人眼看不到黄/绿。让活动态至少保持 MIN_ACTIVE_HOLD_S，
+# 只有优先级更高(更紧急、PRIORITY 数字更小)的状态才能提前打断。
+MIN_ACTIVE_HOLD_S = 0.5
+ACTIVE_HOLD_STATES = {"model", "working", "thinking", "alert"}
 
 # 进程 ID 文件
 PID_FILE = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Temp", "cc_traffic_light_daemon.pid")
@@ -127,7 +140,7 @@ def read_all_states() -> dict:
                         os.remove(os.path.join(state_dir, name))
                     except OSError:
                         pass
-                return {"_global_off": "off"}
+                return {"_global_off": {"state": "off"}}
         except (OSError, json.JSONDecodeError):
             pass
 
@@ -137,12 +150,26 @@ def read_all_states() -> dict:
             continue
         path = os.path.join(state_dir, name)
         try:
+            mode = mask = priority = None
             with open(path, "r") as f:
                 raw = f.read().strip()
             if raw.startswith("{"):
                 data = json.loads(raw)
                 state = data.get("state", "")
                 ts = data.get("ts", 0)
+                # per-hook 灯效（由 set_state_unified 按 (agent,event) 写入）；可缺省
+                if "mode" in data:
+                    mode = data.get("mode")
+                if "mask" in data:
+                    try:
+                        mask = int(data.get("mask"))
+                    except (TypeError, ValueError):
+                        mask = None
+                if "priority" in data:
+                    try:
+                        priority = int(data.get("priority"))
+                    except (TypeError, ValueError):
+                        priority = None
             else:
                 state = raw
                 try:
@@ -155,6 +182,7 @@ def read_all_states() -> dict:
                 log.info("Session %s state %s expired after %.0fs; falling back to idle", name, state, now - ts)
                 state = "idle"
                 ts = now
+                mode = mask = priority = None
                 try:
                     write_state_file(path, state, ts)
                 except OSError:
@@ -168,36 +196,124 @@ def read_all_states() -> dict:
                 continue
 
             if state in COMMANDS:
-                states[name] = state
+                states[name] = {"state": state, "mode": mode, "mask": mask, "priority": priority}
         except (OSError, json.JSONDecodeError):
             continue
     return states
 
 
-def highest_priority(states: dict) -> str:
-    """从所有终端的状态中，选出优先级最高的那个。"""
+def _entry_priority(entry: dict) -> int:
+    """状态条目的优先级：优先用 hook 自配的优先级，否则回退全局 PRIORITY。"""
+    pr = entry.get("priority")
+    if isinstance(pr, int):
+        return pr
+    return PRIORITY.get(entry.get("state", "off"), 99)
+
+
+def highest_priority(states: dict) -> dict:
+    """从所有终端的状态条目中，选出优先级最高（数字最小）的那个条目。"""
     if not states:
-        return "off"
-    return min(states.values(), key=lambda s: PRIORITY.get(s, 99))
+        return {"state": "off", "mode": None, "mask": None, "priority": None}
+    return min(states.values(), key=_entry_priority)
+
+
+def drain_gui_proto(link) -> bool:
+    """
+    若存在 GUI 提交的 v1 原始帧（hex），经传输层写出后删除请求文件。
+    返回是否尝试发送（成功或失败均删除文件，避免堆积）。
+    """
+    path = gui_proto_request_path()
+    if not os.path.isfile(path):
+        return False
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        hexs = (data.get("hex") or "").replace(" ", "")
+        raw = bytes.fromhex(hexs)
+        if raw and hasattr(link, "send_raw"):
+            if not link.send_raw(raw):
+                log.warning("GUI proto 帧写入传输层失败")
+        elif raw:
+            log.warning("当前传输层不支持 send_raw，丢弃 GUI proto")
+    except (OSError, json.JSONDecodeError, ValueError):
+        log.warning("GUI proto 请求无效:\n%s", traceback.format_exc())
+    finally:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+    return True
+
+
+def _send_frame(link, frame: bytes) -> None:
+    """发送一帧；失败则关链路并抛 ConnectionError 交外层重连。"""
+    if not link.send_raw(frame):
+        try:
+            link.close()
+        except Exception:
+            pass
+        raise ConnectionError("硬件连接断开")
 
 
 def run_once(link):
     """
-    主循环：轮询状态文件，向硬件发送指令（USB 串口或 BLE）。
+    主循环：轮询状态文件，按「状态灯效」配置向硬件发送扩展帧（SET_LIGHTING）。
     正常情况下永远不会返回（无限循环）。
     连接断开时抛出 ConnectionError，由外层处理重连。
+
+    灯效来源：
+      - per-hook「模式/颜色/优先级」由 set_state_unified 写入状态文件；
+      - 全局「周期/亮度」来自 config/tl_hook_light_gui.json 的 basic，支持热重载。
     """
-    last_cmd = None
+    cfg_path = effects_config_path()
+    basic = le.basic_light_params(le.load_gui_doc(cfg_path))
+    cfg_mtime = effects_config_mtime(cfg_path)
+    log.info("已加载全局灯参 %s: %s", cfg_path, basic)
+
+    last_frame = None
+    last_state = "off"
+    last_switch = 0.0
     while True:
         try:
+            # GUI 试灯（IPC 原始帧）：直接透传一帧；不强制重置，
+            # 试灯效果会持续显示到下一次真实状态切换，符合「看一眼灯效」的预期。
+            drain_gui_proto(link)
+
+            # 配置热重载：文件 mtime 变动即重载全局灯参（周期/亮度），强制下一帧重发。
+            # per-hook 的「模式+颜色+优先级」由 set_state 写进状态文件，无需在此重载。
+            m = effects_config_mtime(cfg_path)
+            if m != cfg_mtime:
+                cfg_mtime = m
+                basic = le.basic_light_params(le.load_gui_doc(cfg_path))
+                last_frame = None
+                log.info("全局灯参已热重载: %s", basic)
+
             states = read_all_states()
             best = highest_priority(states)
-            cmd = COMMANDS.get(best, "O")
+            best_state = best.get("state", "off")
 
-            if cmd != last_cmd:
-                link, last_cmd = transport_send(link, cmd, last_cmd)
-                if link is None:
-                    raise ConnectionError("硬件连接断开")
+            # 最短显示时间：保证活动态(黄/绿等)至少亮够 MIN_ACTIVE_HOLD_S，
+            # 避免 working/thinking 高速交替时一闪而过、人眼看不到。
+            # 更紧急的状态(如 alert)优先级更高，仍可立即打断。
+            now = time.time()
+            if (
+                last_state in ACTIVE_HOLD_STATES
+                and (now - last_switch) < MIN_ACTIVE_HOLD_S
+                and PRIORITY.get(best_state, 99) >= PRIORITY.get(last_state, 99)
+                and best_state != last_state
+            ):
+                time.sleep(POLL_INTERVAL)
+                continue
+
+            frame = le.frame_for_runtime(best_state, best.get("mode"), best.get("mask"), basic)
+
+            if frame != last_frame:
+                _send_frame(link, frame)
+                if best_state != last_state:
+                    log.info("灯态切换: %s -> %s (frame=%s)", last_state, best_state, frame.hex())
+                last_frame = frame
+                last_state = best_state
+                last_switch = now
 
             time.sleep(POLL_INTERVAL)
 
@@ -211,14 +327,35 @@ def run_once(link):
 
 def acquire_lock():
     """
-    用文件锁确保单实例。返回锁文件描述符（保持打开），或 None（已有实例）。
+    用文件锁确保单实例。返回锁文件描述符（保持打开），或 None（已有实例或加锁失败）。
+    加锁失败时必须关闭已打开的 fd，否则句柄泄漏且可能让排障更难。
     """
     try:
         fd = os.open(LOCK_FILE, os.O_CREAT | os.O_WRONLY | os.O_TRUNC)
+    except OSError:
+        return None
+    try:
         msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
         return fd
     except (IOError, OSError):
+        try:
+            os.close(fd)
+        except OSError:
+            pass
         return None
+
+
+def _pid_file_points_to_live_process() -> bool:
+    """PID 文件存在且对应进程仍存活（用于判断是否真有另一实例在跑）。
+
+    用 proc_util.pid_alive()，绝不能用 os.kill(pid, 0)：Windows 上那会杀死目标进程。
+    """
+    try:
+        with open(PID_FILE, "r", encoding="utf-8") as f:
+            pid = int(f.read().strip())
+    except (OSError, ValueError):
+        return False
+    return pid_alive(pid)
 
 
 def main():
@@ -226,17 +363,43 @@ def main():
 
     # 单实例检查：用文件锁确保只有一个 daemon 运行
     lock_fd = acquire_lock()
+    if lock_fd is None and not _pid_file_points_to_live_process():
+        # 无存活 PID 却仍占锁：多为崩溃/杀进程后的陈旧状态，删锁后重试一次
+        try:
+            os.unlink(LOCK_FILE)
+        except OSError:
+            pass
+        time.sleep(0.15)
+        lock_fd = acquire_lock()
+
     if lock_fd is None:
+        try:
+            ts = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+            with open(LOG_FILE, "a", encoding="utf-8") as f:
+                f.write(
+                    f"{ts} [INFO] 守护进程未启动：文件锁已被占用（单实例）。"
+                    "若已无灯控在运行，可删除 cc_traffic_light_daemon.lock 后再试。\n"
+                )
+        except OSError:
+            pass
         sys.exit(0)
+
+    # 尽早写入 PID，便于 GUI 在「等硬件」阶段也能判定进程已存在（原子替换，避免读到半截）
+    pid_str = str(os.getpid())
+    pid_tmp = PID_FILE + ".tmp"
+    with open(pid_tmp, "w", encoding="utf-8") as f:
+        f.write(pid_str)
+        f.flush()
+        try:
+            os.fsync(f.fileno())
+        except OSError:
+            pass
+    os.replace(pid_tmp, PID_FILE)
 
     log.info("守护进程启动, PID=%d", os.getpid())
 
     # 注册退出日志
     atexit.register(lambda: log.warning("守护进程退出, PID=%d", os.getpid()))
-
-    # 写入 PID 文件
-    with open(PID_FILE, "w") as f:
-        f.write(str(os.getpid()))
 
     # 确保状态目录存在
     state_dir = get_state_dir()

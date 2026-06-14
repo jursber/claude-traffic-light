@@ -10,6 +10,11 @@
       "name": "OpenAI Codex",
       "state_dir": "codex_tl_states",
       "hooks_config": "~/.codex/hooks.json"
+    },
+    "cursor": {
+      "name": "Cursor",
+      "state_dir": "cursor_tl_states",
+      "hooks_config": "~/.cursor/hooks.json"
     }
   }
 }

@@ -1,9 +1,9 @@
-# Claude Code / Codex — Hook 全量与红绿灯接线
+# Claude Code / Codex / Cursor — Hook 全量与红绿灯接线
 
 本文档说明 **官方支持的 Hook 事件全量列表**、**本仓库 `switch_agent` 默认写入 IDE 的接线子集**，以及 **V2.0 除 Hook 外的机制**。
 
-- **机器可读目录**：`src/claude_tl/hook_light_catalog.py`（`CLAUDE_HOOK_CATALOG` / `CODEX_HOOK_CATALOG`，含 `wired` 与 `wire_kind`）。
-- **GUI**：`tools/tl_hook_light_gui.py` 第一行可切换 **Claude / Codex**（调用 `switch_agent.switch_agent`，异步 + 进度条）；Claude/Codex 两 Tab 与目录行一一对应。
+- **机器可读目录**：`src/claude_tl/hook_light_catalog.py`（`CLAUDE_HOOK_CATALOG` / `CODEX_HOOK_CATALOG` / `CURSOR_HOOK_CATALOG`，含 `wired` 与 `wire_kind`）。
+- **GUI**：`tools/tl_hook_light_gui.py` 第一行可切换 **Claude / Codex / Cursor**（调用 `switch_agent.switch_agent`，异步 + 进度条）；三 Tab 与目录行一一对应。
 
 ---
 
@@ -75,10 +75,26 @@ Git 标签 **`V2.0`** 下同样是：**Hook 脚本极薄**（`set_state.py` / `s
 
 ---
 
+## Cursor — 官方 Agent / Tab / 工作区事件
+
+依据 [Hooks | Cursor Docs](https://cursor.com/docs/hooks)（2026-06）。**`hooks.json`** 位于用户目录 **`~/.cursor/hooks.json`** 或仓库 **`.cursor/hooks.json`**；事件键为 **camelCase**（如 `sessionStart`）。`switch_agent` 写入用户级文件时，与 Claude/Codex 一样只增删**本项目**的 `command` 项，保留用户其它 hook。
+
+**会话标识**：Cursor 在通用输入里使用 **`conversation_id`**（与 `session_id` 同义）；`set_state_unified.py` 已同时识别二者。若只认 `session_id`，会出现 `beforeSubmitPrompt` / `preToolUse` 等从不落盘状态、但 `stop` 仍把灯打成 **idle（红灯常亮）** 的现象。
+
+**Hook 命令里的 Python**：`switch_agent` 写入 hooks 时使用 **`sys.executable` 绝对路径**（或环境变量 **`CC_TL_PYTHON`**），避免 Cursor 子进程 PATH 里没有 `python` 时 hook 静默失败、守护进程一直发全灭 **`O`**（灯全不亮）。若你曾用旧版「裸 `python`」hooks，请在配置台再切一次当前 Agent 以重写 `hooks.json`。
+
+**默认接线（`wired=True`）** 与 Claude/Codex 语义对齐：`sessionStart` 起守护进程；`beforeSubmitPrompt` → `prompt`；`preToolUse` → `auto`；`postToolUse` / `postToolUseFailure` / `preCompact` / `stop` / 子代理起止 / `sessionEnd` 等同理。`beforeShellExecution` / `beforeMCPExecution` 等可在脚本里返回 `permission`，但默认**不**接线以免每条命令触发。
+
+全量行见 **`CURSOR_HOOK_CATALOG`**；生成 IDE 片段用 **`iter_cursor_wired_hook_items()`**（扁平 `{ "command", "timeout" }` 列表，与 Claude 的嵌套 `matcher`+`hooks` 结构不同）。
+
+---
+
 ## GUI 与 `tl_hook_light_gui.json`
 
-- **Agent 切换**：写 `active_agent.json` 并改写 Claude/Codex 的 hooks；完成后应 **重启对应 IDE 会话**。
-- **灯光/优先级表**：存 `config/tl_hook_light_gui.json`；**守护进程按 hook 映射灯效** 仍为后续工作。
+- **Agent 切换**：写 `active_agent.json` 并改写 Claude / Codex / Cursor 的 hooks；完成后应 **重启对应 IDE 或 Agent 会话**（Cursor 见官方说明，常需重启应用）。
+- **灯光/优先级表**：存 `config/tl_hook_light_gui.json`；默认行与 **`hook_light_catalog.default_hook_gui_row()`** 对齐（V2 状态语义）。**守护进程按 hook 映射灯效** 仍为后续工作。
+- **多会话与优先级说明**：见 `docs/MULTI_SESSION_AND_EFFECT_PRIORITY.md`。
+- **Codex 官方事件数量与「非 Hook」灯控路径**：见 `docs/CODEX_HOOKS_AND_LIGHT_PATHS.md`。
 
 ---
 
@@ -86,6 +102,6 @@ Git 标签 **`V2.0`** 下同样是：**Hook 脚本极薄**（`set_state.py` / `s
 
 | 文件 | 作用 |
 |------|------|
-| `src/claude_tl/hook_light_catalog.py` | 全量目录 + `iter_*_wired_hook_groups` |
+| `src/claude_tl/hook_light_catalog.py` | 全量目录 + `iter_*_wired_hook_groups` / `iter_cursor_wired_hook_items` |
 | `src/claude_tl/switch_agent.py` | 启用/禁用 hooks、`switch_agent()` |
 | `tools/tl_hook_light_gui.py` | 配置 GUI + Agent 切换 |

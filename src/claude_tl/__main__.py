@@ -21,7 +21,7 @@ def _usage() -> None:
   set-state           经典 set_state
   set-state-unified   统一 set_state
   set-alert           PermissionRequest 专用
-  switch-agent        claude | codex | status
+  switch-agent        claude | codex | cursor | status
 
 示例:
   python -m claude_tl daemon-unified

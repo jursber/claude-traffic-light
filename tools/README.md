@@ -5,7 +5,10 @@
 VibeLight 桌面调试台（Tkinter）：USB 串口与 BLE 发送 **v1 二进制帧** 及旧版 ASCII。
 
 ```bash
-# 仓库根目录
+# 仓库根目录（Windows 推荐 pythonw，避免附着黑色控制台窗口）
+pythonw tools/vibelight_gui.py
+# 或双击 tools/vibelight_gui.pyw（系统通常用 pythonw 打开 .pyw）
+# python.exe 会先 ShowWindow 隐藏控制台再 FreeConsole；仍建议 pythonw / .pyw
 python tools/vibelight_gui.py
 ```
 
@@ -15,8 +18,28 @@ python tools/vibelight_gui.py
 
 ## `tl_hook_light_gui.py`
 
-Hook × 灯光配置台（三 Tab：基础设置 / Claude / Codex），含 **第一行 Claude↔Codex 切换**（异步调用 `switch_agent`，带进度条）。全量 Hook 列表见 **`docs/HOOK_EVENTS_REFERENCE.md`** / `src/claude_tl/hook_light_catalog.py`；配置保存 **`config/tl_hook_light_gui.json`**。
+Hook × 灯光配置台（四 Tab：基础设置 / Claude / Codex / Cursor），含 **第一行 Agent 切换**（异步调用 `switch_agent`，带进度条）。全量 Hook 列表见 **`docs/HOOK_EVENTS_REFERENCE.md`** / `src/claude_tl/hook_light_catalog.py`；配置保存 **`config/tl_hook_light_gui.json`**。串口占用见 **`docs/SERIAL_PORT_TROUBLESHOOTING.md`**（建议拔插 USB、任务管理器或 Process Explorer）。
 
 ```bash
+# Windows 推荐（无控制台窗口）
+pythonw tools/tl_hook_light_gui.py
+# 或双击 tools/tl_hook_light_gui.pyw
+# python.exe 会先隐藏控制台再脱离；仍推荐 pythonw / .pyw
 python tools/tl_hook_light_gui.py
+```
+
+**开机启动灯控后台**：本程序写入的是启动文件夹里的 **`VibeCodingLight-unified-daemon.vbs`**（无窗口，不经 `cmd`）。若你机器上仍有旧版同名 **`.bat`**，打开本程序并勾选「开机启动」后会自动升级为 `.vbs`。
+
+## `e2e_selftest.py`
+
+一键端到端自检：**默认在终端询问你灯态**（每步输入 `ok` / `wrong …` / `skip`）；CI 或非交互加 **`--batch`** 跳过目视。
+
+报告 **`reports/e2e_selftest_report.json`**，摘要 **`reports/E2E_MODIFICATION_PLAN.md`**。
+
+```bash
+# 交互（需灯与 COM 就绪，按提示回答）
+python tools/e2e_selftest.py
+
+# 无人值守（不问你灯）
+python tools/e2e_selftest.py --batch
 ```

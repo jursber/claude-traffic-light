@@ -1,0 +1,82 @@
+{
+  "T_kill": {
+    "ok": true,
+    "msg": "已杀相关进程并尝试删 lock"
+  },
+  "T_hook_cmd": {
+    "ok": true,
+    "msg": "C:\\Users\\Administrator\\AppData\\Local\\hermes\\hermes-agent\\venv\\Scripts\\python.exe E:\\Cursor\\claude_traffic_light\\set_state_unified.py thinking"
+  },
+  "T_switch_cursor": {
+    "ok": true,
+    "msg": "switch_agent.py cursor OK"
+  },
+  "T_cursor_hooks": {
+    "ok": true,
+    "msg": "hooks.json OK"
+  },
+  "T_stdin_prompt": {
+    "ok": true,
+    "msg": "prompt→thinking 落盘 OK"
+  },
+  "T_daemon_start": {
+    "ok": true,
+    "msg": "daemon 已起且硬件已连接",
+    "details": {
+      "pid_live": true,
+      "hardware_log": true
+    }
+  },
+  "LAMP_thinking": {
+    "ok": true,
+    "msg": "batch: 已跳过目视（CC_TL_E2E_BATCH=1 或非 TTY）"
+  },
+  "LAMP_working": {
+    "ok": true,
+    "msg": "batch: 已跳过目视（CC_TL_E2E_BATCH=1 或非 TTY）"
+  },
+  "LAMP_model": {
+    "ok": true,
+    "msg": "batch: 已跳过目视（CC_TL_E2E_BATCH=1 或非 TTY）"
+  },
+  "LAMP_alert": {
+    "ok": true,
+    "msg": "batch: 已跳过目视（CC_TL_E2E_BATCH=1 或非 TTY）"
+  },
+  "LAMP_idle": {
+    "ok": true,
+    "msg": "batch: 已跳过目视（CC_TL_E2E_BATCH=1 或非 TTY）"
+  },
+  "LAMP_off": {
+    "ok": true,
+    "msg": "batch: 已跳过目视（CC_TL_E2E_BATCH=1 或非 TTY）"
+  },
+  "T_lamp_suite": {
+    "ok": true,
+    "msg": "全套目视通过"
+  },
+  "T_edge_invalid_state": {
+    "ok": true,
+    "msg": "非法 argv 状态已拒绝"
+  },
+  "T_edge_auto": {
+    "ok": true,
+    "msg": "auto→working OK"
+  },
+  "T_daemon_lock2": {
+    "ok": true,
+    "msg": "第二实例抢锁失败已记入日志"
+  },
+  "T_switch_claude": {
+    "ok": true,
+    "msg": "switch_agent.py claude OK"
+  },
+  "T_switch_cursor2": {
+    "ok": true,
+    "msg": "switch_agent.py cursor OK"
+  },
+  "T_pytest": {
+    "ok": true,
+    "msg": "pytest OK"
+  }
+}

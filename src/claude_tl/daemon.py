@@ -17,6 +17,7 @@ import logging
 import atexit
 
 from claude_tl.config import COMMANDS, STATE_DIR, PRIORITY
+from claude_tl.proc_util import pid_alive
 from claude_tl.tl_transport import send_cmd as transport_send, transport_mode, wait_for_transport
 
 # ============================================================
@@ -163,9 +164,8 @@ def is_another_running():
             old_pid = int(f.read().strip())
         if old_pid == os.getpid():
             return False
-        # 检查该 PID 是否还活着
-        os.kill(old_pid, 0)  # 不发信号，只检查存在性
-        return True
+        # 检查该 PID 是否还活着（务必用 pid_alive：Windows 上 os.kill(pid,0) 会杀死进程）
+        return pid_alive(old_pid)
     except (OSError, ValueError):
         return False
 

@@ -37,7 +37,7 @@ def clean_session(session):
         pass
 
 
-def test(name, state, duration=2):
+def run_state_demo(name, state, duration=2):
     print(f"  {name:15s} ({state:10s} -> '{COMMANDS[state]}') ... ", end="", flush=True)
     write_state(state)
     time.sleep(duration)
@@ -60,7 +60,7 @@ def main():
         ("全灭（会话结束）", "off"),
     ]
     for name, state in tests:
-        test(name, state, duration=2)
+        run_state_demo(name, state, duration=2)
 
     print("\n[测试 2] 多终端优先级")
     print("  同时写入 idle 与 alert ... ", end="", flush=True)

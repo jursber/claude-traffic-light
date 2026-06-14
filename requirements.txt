@@ -1,4 +1,6 @@
 pyserial>=3.5
 bleak>=0.21.0
+pystray>=0.19.5
+Pillow>=10.0.0
 
 # 开发（pytest）：pip install -e ".[dev]"

@@ -23,7 +23,14 @@ log = logging.getLogger("tl_transport")
 
 
 def transport_mode() -> str:
-    return os.environ.get("CC_TL_TRANSPORT", "serial").lower().strip()
+    """读取 CC_TL_TRANSPORT；在极少数 Windows 环境下 os.environ 访问可能抛 OSError(WinError 87)。"""
+    try:
+        v = os.environ.get("CC_TL_TRANSPORT", "serial")
+    except OSError:
+        return "serial"
+    if not v:
+        return "serial"
+    return str(v).lower().strip() or "serial"
 
 
 def find_esp32_port() -> Optional[str]:
@@ -49,13 +56,16 @@ class SerialLink:
     def wait_connected(self) -> None:
         return None
 
-    def send(self, cmd: str) -> bool:
+    def send_raw(self, data: bytes) -> bool:
         try:
-            self._ser.write(cmd.encode("ascii"))
+            self._ser.write(data)
             self._ser.flush()
             return True
         except (serial.SerialException, OSError):
             return False
+
+    def send(self, cmd: str) -> bool:
+        return self.send_raw(cmd.encode("ascii"))
 
     def close(self) -> None:
         try:
@@ -73,7 +83,7 @@ class BleLink:
     def __init__(self) -> None:
         self._name = BLE_DEVICE_NAME
         self._char_uuid = BLE_CHAR_UUID
-        self._cmd_queue: queue.Queue[str] = queue.Queue(maxsize=32)
+        self._cmd_queue: queue.Queue[bytes] = queue.Queue(maxsize=32)
         self._connected = threading.Event()
         self._stop = threading.Event()
         self._thread: Optional[threading.Thread] = None
@@ -124,7 +134,7 @@ class BleLink:
                         try:
                             await client.write_gatt_char(
                                 self._char_uuid,
-                                cmd.encode("ascii"),
+                                cmd,
                                 response=False,
                             )
                         except Exception as ex:
@@ -141,7 +151,7 @@ class BleLink:
             if not self._stop.is_set():
                 await asyncio.sleep(2)
 
-    def _blocking_get_cmd(self) -> Optional[str]:
+    def _blocking_get_cmd(self) -> Optional[bytes]:
         try:
             return self._cmd_queue.get(timeout=0.15)
         except queue.Empty:
@@ -164,15 +174,18 @@ class BleLink:
                 return
             log.info("等待 BLE 设备 %s ...", self._name)
 
-    def send(self, cmd: str) -> bool:
+    def send_raw(self, data: bytes) -> bool:
         if not self._connected.is_set():
             return False
         try:
-            self._cmd_queue.put_nowait(cmd)
+            self._cmd_queue.put_nowait(data)
             return True
         except queue.Full:
             log.warning("BLE 命令队列已满，丢弃")
             return False
+
+    def send(self, cmd: str) -> bool:
+        return self.send_raw(cmd.encode("ascii"))
 
     def close(self) -> None:
         self._stop.set()

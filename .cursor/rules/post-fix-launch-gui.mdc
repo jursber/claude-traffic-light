@@ -1,0 +1,26 @@
+---
+description: 在本仓库完成代码修复或改动后自动启动 Hook 配置台（pythonw）
+alwaysApply: true
+---
+
+# 修复后自动启动 GUI
+
+仅适用于本仓库（VibeCodingLight / claude_traffic_light）。
+
+## 要求
+
+在**本项目中改动了代码或配置**并交付给用户时，除非用户当次明确说「不要启动」或「只改文档」，否则**必须在同一轮对话末尾**自动执行启动（用终端工具，不要只写命令让用户自己跑）。
+
+## 启动命令（Windows）
+
+在仓库根目录 `E:\Cursor\claude_traffic_light`（或用户机器上的克隆路径）执行：
+
+1. 优先：`Start-Process` 调用存在的 `.\venv\Scripts\pythonw.exe` 或 `.\.venv\Scripts\pythonw.exe`，参数为 `tools\tl_hook_light_gui.py`，`WorkingDirectory` 为仓库根。
+2. 若无 venv：用 `pythonw`，同样参数与工作目录。
+
+目的：无黑色控制台窗口；启动的是 **Hook×灯效配置台** `tools/tl_hook_light_gui.py`。
+
+## 例外
+
+- 用户明确说本次不用启动。
+- 仅纯文档/注释改动且用户未要求验证界面时，可省略（若不确定则仍启动一次无妨）。

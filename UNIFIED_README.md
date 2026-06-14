@@ -1,17 +1,17 @@
-# 统一红绿灯系统 - 支持 Claude Code 和 OpenAI Codex
+# 统一红绿灯系统 - 支持 Claude Code、OpenAI Codex 与 Cursor
 
-本系统支持在 Claude Code 和 OpenAI Codex 之间切换，共享同一套硬件红绿灯。
+本系统支持在 Claude Code、OpenAI Codex 与 Cursor 之间切换，共享同一套硬件红绿灯。
 
 ## 架构设计
 
 ```
-CC hooks  ──┐
-            ├──→ 状态文件 ──→ daemon ──→ ESP32C3
-Codex hooks ─┘
+CC hooks   ──┐
+Codex hooks ├──→ 状态文件 ──→ daemon ──→ ESP32C3
+Cursor hooks ┘
 ```
 
-- **底层（通用）**：daemon + 状态文件 + 串口通信，与 CC/Codex 无关
-- **上层（适配）**：各自的 hook 系统，写入同一个状态目录
+- **底层（通用）**：daemon + 状态文件 + 串口通信，与 CC/Codex/Cursor 无关
+- **上层（适配）**：各自的 hook 系统，写入当前 agent 对应的状态目录
 - **切换机制**：配置文件指定当前激活的 agent
 
 ## 文件说明
@@ -19,7 +19,7 @@ Codex hooks ─┘
 | 文件 | 作用 |
 |------|------|
 | `active_agent.json` | 配置文件，指定当前激活的 agent |
-| `daemon_unified.py` | 统一守护进程，支持 CC 和 Codex |
+| `daemon_unified.py` | 统一守护进程，支持 CC、Codex、Cursor |
 | `set_state_unified.py` | 统一状态设置脚本 |
 | `start_daemon_unified.py` | 统一守护进程启动器 |
 | `daemon_guard_unified.vbs` | 统一守护脚本（开机自启） |
@@ -40,13 +40,19 @@ python switch_agent.py claude
 python switch_agent.py codex
 ```
 
-### 3. 查看当前状态
+### 3. 切换到 Cursor
+
+```bash
+python switch_agent.py cursor
+```
+
+### 4. 查看当前状态
 
 ```bash
 python switch_agent.py status
 ```
 
-### 4. 测试红绿灯
+### 5. 测试红绿灯
 
 ```bash
 python tests/test_unified.py test
@@ -69,27 +75,32 @@ python tests/test_unified.py test
       "name": "OpenAI Codex",
       "state_dir": "codex_tl_states",
       "hooks_config": "~/.codex/hooks.json"
+    },
+    "cursor": {
+      "name": "Cursor",
+      "state_dir": "cursor_tl_states",
+      "hooks_config": "~/.cursor/hooks.json"
     }
   }
 }
 ```
 
-- `active`: 当前激活的 agent（"claude" 或 "codex"）
+- `active`: 当前激活的 agent（`"claude"`、`"codex"` 或 `"cursor"`）
 - `agents`: Agent 配置
   - `state_dir`: 状态文件目录名（相对于 %LOCALAPPDATA%\Temp\）
   - `hooks_config`: Hook 配置文件路径
 
 ## Hook 事件映射
 
-> **全量事件名与默认接线**以 **`docs/HOOK_EVENTS_REFERENCE.md`** 与 **`src/claude_tl/hook_light_catalog.py`** 为准（Claude 官方文档约 30 个生命周期事件；Codex 以 OpenAI 文档为准）。下表为**状态语义**与**代表性事件**的简图，便于对照守护进程优先级。
+> **全量事件名与默认接线**以 **`docs/HOOK_EVENTS_REFERENCE.md`** 与 **`src/claude_tl/hook_light_catalog.py`** 为准（Claude 官方文档约 30 个生命周期事件；Codex 以 OpenAI 文档为准；Cursor 以 [cursor.com/docs/hooks](https://cursor.com/docs/hooks) 为准）。下表为**状态语义**与**代表性事件**的简图，便于对照守护进程优先级。
 
-| 状态 | Claude Code（代表性事件） | Codex（代表性事件） |
-|------|--------------------------|----------------------|
-| thinking | `UserPromptSubmit` / `PostToolBatch` / `SubagentStart` / `PreCompact` / … | `UserPromptSubmit` / `PostToolUse` / `SubagentStart` / `PreCompact` / … |
-| working | `PreToolUse`(auto) / `PostToolUse` / `SubagentStop` / … | `PreToolUse`(auto) / `SubagentStop` / … |
-| alert | `PermissionRequest` / `Notification` / `StopFailure` / `PermissionDenied` / `Elicitation` / … | `PermissionRequest` / `PreToolUse`(auto) / … |
-| idle | `Stop` / `PostCompact` / `Setup` / … | `Stop` / `PostCompact` / … |
-| off | `SessionEnd` | `SessionEnd` |
+| 状态 | Claude Code（代表性事件） | Codex（代表性事件） | Cursor（代表性事件） |
+|------|--------------------------|----------------------|----------------------|
+| thinking | `UserPromptSubmit` / `PostToolBatch` / `SubagentStart` / `PreCompact` / … | `UserPromptSubmit` / `PostToolUse` / `SubagentStart` / `PreCompact` / … | `beforeSubmitPrompt` / `postToolUse` / `subagentStart` / `preCompact` / … |
+| working | `PreToolUse`(auto) / `PostToolUse` / `SubagentStop` / … | `PreToolUse`(auto) / `SubagentStop` / … | `preToolUse`(auto) / `subagentStop` / … |
+| alert | `PermissionRequest` / `Notification` / `StopFailure` / `PermissionDenied` / `Elicitation` / … | `PermissionRequest` / `PreToolUse`(auto) / … | `postToolUseFailure` / … |
+| idle | `Stop` / `PostCompact` / `Setup` / … | `Stop` / `PostCompact` / … | `stop` / … |
+| off | `SessionEnd` | `SessionEnd` | `sessionEnd` |
 
 另：`SessionStart` 仅用于启动统一守护进程，不映射上表「灯色状态」。
 

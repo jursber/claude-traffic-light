@@ -1,0 +1,459 @@
+{
+  "version": 1,
+  "basic": {
+    "port": "COM3",
+    "duty_g": 255,
+    "duty_y": 255,
+    "duty_r": 255,
+    "blink_period_ms": 800,
+    "breath_period_ms": 2000,
+    "test_mode": false,
+    "boot_autostart_daemon": true
+  },
+  "claude": {
+    "rows": [
+      {
+        "event": "SessionStart",
+        "zh": "会话开始",
+        "effect": "none",
+        "mask": 0,
+        "priority": 12
+      },
+      {
+        "event": "Setup",
+        "zh": "安装/维护模式",
+        "effect": "solid",
+        "mask": 4,
+        "priority": 5
+      },
+      {
+        "event": "UserPromptSubmit",
+        "zh": "用户提交提示",
+        "effect": "blink",
+        "mask": 1,
+        "priority": 3
+      },
+      {
+        "event": "UserPromptExpansion",
+        "zh": "命令展开为提示",
+        "effect": "blink",
+        "mask": 2,
+        "priority": 2
+      },
+      {
+        "event": "PreToolUse",
+        "zh": "工具调用前",
+        "effect": "solid",
+        "mask": 1,
+        "priority": 4
+      },
+      {
+        "event": "PermissionRequest",
+        "zh": "权限请求",
+        "effect": "blink",
+        "mask": 4,
+        "priority": 1
+      },
+      {
+        "event": "PermissionDenied",
+        "zh": "权限被拒绝",
+        "effect": "blink",
+        "mask": 4,
+        "priority": 1
+      },
+      {
+        "event": "PostToolUse",
+        "zh": "工具成功后",
+        "effect": "solid",
+        "mask": 1,
+        "priority": 4
+      },
+      {
+        "event": "PostToolUseFailure",
+        "zh": "工具失败后",
+        "effect": "blink",
+        "mask": 4,
+        "priority": 1
+      },
+      {
+        "event": "PostToolBatch",
+        "zh": "并行工具批结束",
+        "effect": "blink",
+        "mask": 2,
+        "priority": 2
+      },
+      {
+        "event": "Notification",
+        "zh": "通知",
+        "effect": "blink",
+        "mask": 4,
+        "priority": 1
+      },
+      {
+        "event": "SubagentStart",
+        "zh": "子代理启动",
+        "effect": "blink",
+        "mask": 2,
+        "priority": 2
+      },
+      {
+        "event": "SubagentStop",
+        "zh": "子代理结束",
+        "effect": "solid",
+        "mask": 1,
+        "priority": 4
+      },
+      {
+        "event": "Stop",
+        "zh": "回合停止",
+        "effect": "solid",
+        "mask": 4,
+        "priority": 5
+      },
+      {
+        "event": "StopFailure",
+        "zh": "停止失败/API 错",
+        "effect": "blink",
+        "mask": 4,
+        "priority": 1
+      },
+      {
+        "event": "PreCompact",
+        "zh": "压缩上下文前",
+        "effect": "blink",
+        "mask": 2,
+        "priority": 2
+      },
+      {
+        "event": "PostCompact",
+        "zh": "压缩上下文后",
+        "effect": "solid",
+        "mask": 4,
+        "priority": 5
+      },
+      {
+        "event": "Elicitation",
+        "zh": "MCP 征求输入",
+        "effect": "blink",
+        "mask": 4,
+        "priority": 1
+      },
+      {
+        "event": "ElicitationResult",
+        "zh": "MCP 征求结果",
+        "effect": "solid",
+        "mask": 4,
+        "priority": 5
+      },
+      {
+        "event": "SessionEnd",
+        "zh": "会话结束",
+        "effect": "none",
+        "mask": 0,
+        "priority": 12
+      },
+      {
+        "event": "ConfigChange",
+        "zh": "配置变更",
+        "effect": "none",
+        "mask": 0,
+        "priority": 12
+      },
+      {
+        "event": "CwdChanged",
+        "zh": "工作目录变更",
+        "effect": "none",
+        "mask": 0,
+        "priority": 12
+      },
+      {
+        "event": "FileChanged",
+        "zh": "监视文件变更",
+        "effect": "none",
+        "mask": 0,
+        "priority": 12
+      },
+      {
+        "event": "WorktreeCreate",
+        "zh": "工作树创建",
+        "effect": "none",
+        "mask": 0,
+        "priority": 12
+      },
+      {
+        "event": "WorktreeRemove",
+        "zh": "工作树移除",
+        "effect": "none",
+        "mask": 0,
+        "priority": 12
+      },
+      {
+        "event": "MessageDisplay",
+        "zh": "助手消息展示",
+        "effect": "none",
+        "mask": 0,
+        "priority": 12
+      },
+      {
+        "event": "TaskCreated",
+        "zh": "任务创建",
+        "effect": "none",
+        "mask": 0,
+        "priority": 12
+      },
+      {
+        "event": "TaskCompleted",
+        "zh": "任务完成",
+        "effect": "none",
+        "mask": 0,
+        "priority": 12
+      },
+      {
+        "event": "TeammateIdle",
+        "zh": "队友即将空闲",
+        "effect": "none",
+        "mask": 0,
+        "priority": 12
+      },
+      {
+        "event": "InstructionsLoaded",
+        "zh": "规则/说明加载",
+        "effect": "none",
+        "mask": 0,
+        "priority": 12
+      }
+    ]
+  },
+  "codex": {
+    "rows": [
+      {
+        "event": "SessionStart",
+        "zh": "会话开始",
+        "effect": "none",
+        "mask": 0,
+        "priority": 12
+      },
+      {
+        "event": "UserPromptSubmit",
+        "zh": "用户提交提示",
+        "effect": "blink",
+        "mask": 1,
+        "priority": 3
+      },
+      {
+        "event": "PreToolUse",
+        "zh": "工具调用前",
+        "effect": "solid",
+        "mask": 1,
+        "priority": 4
+      },
+      {
+        "event": "PermissionRequest",
+        "zh": "权限请求",
+        "effect": "blink",
+        "mask": 4,
+        "priority": 1
+      },
+      {
+        "event": "PostToolUse",
+        "zh": "工具使用后",
+        "effect": "blink",
+        "mask": 2,
+        "priority": 2
+      },
+      {
+        "event": "PreCompact",
+        "zh": "压缩前",
+        "effect": "blink",
+        "mask": 2,
+        "priority": 2
+      },
+      {
+        "event": "PostCompact",
+        "zh": "压缩后",
+        "effect": "solid",
+        "mask": 4,
+        "priority": 5
+      },
+      {
+        "event": "SubagentStart",
+        "zh": "子代理启动",
+        "effect": "blink",
+        "mask": 2,
+        "priority": 2
+      },
+      {
+        "event": "SubagentStop",
+        "zh": "子代理结束",
+        "effect": "solid",
+        "mask": 1,
+        "priority": 4
+      },
+      {
+        "event": "Stop",
+        "zh": "回合停止",
+        "effect": "solid",
+        "mask": 4,
+        "priority": 5
+      },
+      {
+        "event": "SessionEnd",
+        "zh": "会话结束",
+        "effect": "none",
+        "mask": 0,
+        "priority": 12
+      }
+    ]
+  },
+  "cursor": {
+    "rows": [
+      {
+        "event": "sessionStart",
+        "zh": "会话开始",
+        "effect": "none",
+        "mask": 0,
+        "priority": 12
+      },
+      {
+        "event": "sessionEnd",
+        "zh": "会话结束",
+        "effect": "none",
+        "mask": 0,
+        "priority": 12
+      },
+      {
+        "event": "beforeSubmitPrompt",
+        "zh": "提交提示前",
+        "effect": "blink",
+        "mask": 1,
+        "priority": 3
+      },
+      {
+        "event": "preToolUse",
+        "zh": "工具调用前",
+        "effect": "solid",
+        "mask": 1,
+        "priority": 4
+      },
+      {
+        "event": "postToolUse",
+        "zh": "工具成功后",
+        "effect": "breath",
+        "mask": 2,
+        "priority": 2
+      },
+      {
+        "event": "postToolUseFailure",
+        "zh": "工具失败后",
+        "effect": "blink",
+        "mask": 4,
+        "priority": 1
+      },
+      {
+        "event": "preCompact",
+        "zh": "压缩上下文前",
+        "effect": "breath",
+        "mask": 2,
+        "priority": 2
+      },
+      {
+        "event": "stop",
+        "zh": "回合停止",
+        "effect": "solid",
+        "mask": 4,
+        "priority": 5
+      },
+      {
+        "event": "subagentStart",
+        "zh": "子代理启动",
+        "effect": "blink",
+        "mask": 2,
+        "priority": 2
+      },
+      {
+        "event": "subagentStop",
+        "zh": "子代理结束",
+        "effect": "solid",
+        "mask": 1,
+        "priority": 4
+      },
+      {
+        "event": "beforeShellExecution",
+        "zh": "Shell 执行前",
+        "effect": "none",
+        "mask": 0,
+        "priority": 12
+      },
+      {
+        "event": "afterShellExecution",
+        "zh": "Shell 执行后",
+        "effect": "none",
+        "mask": 0,
+        "priority": 12
+      },
+      {
+        "event": "beforeMCPExecution",
+        "zh": "MCP 执行前",
+        "effect": "none",
+        "mask": 0,
+        "priority": 12
+      },
+      {
+        "event": "afterMCPExecution",
+        "zh": "MCP 执行后",
+        "effect": "none",
+        "mask": 0,
+        "priority": 12
+      },
+      {
+        "event": "beforeReadFile",
+        "zh": "读文件前",
+        "effect": "none",
+        "mask": 0,
+        "priority": 12
+      },
+      {
+        "event": "afterFileEdit",
+        "zh": "文件编辑后",
+        "effect": "none",
+        "mask": 0,
+        "priority": 12
+      },
+      {
+        "event": "afterAgentResponse",
+        "zh": "助手回复后",
+        "effect": "none",
+        "mask": 0,
+        "priority": 12
+      },
+      {
+        "event": "afterAgentThought",
+        "zh": "助手思考后",
+        "effect": "none",
+        "mask": 0,
+        "priority": 12
+      },
+      {
+        "event": "beforeTabFileRead",
+        "zh": "Tab 补全读文件前",
+        "effect": "none",
+        "mask": 0,
+        "priority": 12
+      },
+      {
+        "event": "afterTabFileEdit",
+        "zh": "Tab 补全编辑后",
+        "effect": "none",
+        "mask": 0,
+        "priority": 12
+      },
+      {
+        "event": "workspaceOpen",
+        "zh": "工作区打开",
+        "effect": "none",
+        "mask": 0,
+        "priority": 12
+      }
+    ]
+  }
+}
