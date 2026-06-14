@@ -17,6 +17,7 @@ from claude_tl.hook_light_catalog import (
     iter_codex_wired_hook_groups,
     iter_cursor_wired_hook_items,
 )
+from claude_tl.switch_agent import codex_hook_groups
 from claude_tl.vibelight.protocol import MASK_G, MASK_R, MASK_Y, MODE_BREATH, MODE_SYNC_BLINK, parse_frame
 
 
@@ -77,6 +78,14 @@ def test_wired_hook_commands_include_event_argument() -> None:
             command = item["command"]
             if "set_state_unified.py" in command:
                 assert f"--event {event}" in command
+
+
+def test_codex_hooks_do_not_depend_on_bash_shell() -> None:
+    groups = codex_hook_groups()
+    for event_groups in groups.values():
+        for group in event_groups:
+            for hook in group["hooks"]:
+                assert "shell" not in hook
 
 
 def test_frame_for_runtime_uses_global_periods_and_color_duties() -> None:

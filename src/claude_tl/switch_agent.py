@@ -69,19 +69,11 @@ def hook_command(script: str, state: str, *extra: str) -> str:
 
 def command_hook(command, timeout=5):
     """生成 command hook 配置（Claude / Codex：嵌套 matcher + hooks 列表）。"""
-    from claude_tl.launcher import is_frozen
-
-    hook = {
+    return {
         "type": "command",
         "command": command,
         "timeout": timeout,
     }
-    if not is_frozen():
-        # 开发模式：命令是 `python xxx.py`，而 PowerShell 常不把 hook 的 stdin 传给子进程
-        # → set_state_unified 读不到 session_id 不写灯。用 bash(Git for Windows 即可)绕开。
-        # 打包模式：命令直接是 exe，IDE 会把 stdin 直接 pipe 给它，无需 bash，也就不再依赖 Git。
-        hook["shell"] = "bash"
-    return hook
 
 
 def hook_group(command, matcher="", timeout=5):
