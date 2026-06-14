@@ -104,9 +104,9 @@
       {
         "event": "PostToolUse",
         "zh": "工具成功后",
-        "effect": "solid",
-        "mask": 1,
-        "priority": 4
+        "effect": "breath",
+        "mask": 2,
+        "priority": 2
       },
       {
         "event": "SubagentStop",

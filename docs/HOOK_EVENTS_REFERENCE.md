@@ -27,7 +27,7 @@ Git 标签 **`V2.0`** 下同样是：**Hook 脚本极薄**（`set_state.py` / `s
 | `PreToolUse` | 工具调用前 | 是 | `auto` |
 | `PermissionRequest` | 权限请求 | 是 | `set_alert_and_defer.py` |
 | `PermissionDenied` | 权限被拒绝 | 是 | `alert` |
-| `PostToolUse` | 工具成功后 | 是 | `working` |
+| `PostToolUse` | 工具成功后 | 是 | `thinking` |
 | `PostToolUseFailure` | 工具失败后 | 是 | `alert` |
 | `PostToolBatch` | 并行工具批结束 | 是 | `thinking` |
 | `Notification` | 通知 | 是（matcher=`permission_prompt`） | `alert`；其它 notification type 可再自行加 hook 组 |

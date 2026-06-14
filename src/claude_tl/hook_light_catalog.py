@@ -66,7 +66,7 @@ CLAUDE_HOOK_CATALOG: tuple[HookCatalogEntry, ...] = (
     _ce("PreToolUse", "工具调用前", "每次工具执行前，可拦截", "", True, "set_state", "auto"),
     _ce("PermissionRequest", "权限请求", "出现权限对话框", "", True, "alert", ""),
     _ce("PermissionDenied", "权限被拒绝", "自动模式拒绝工具后可 retry", "", True, "set_state", "alert"),
-    _ce("PostToolUse", "工具成功后", "单次工具成功返回后", "", True, "set_state", "working"),
+    _ce("PostToolUse", "工具成功后", "单次工具成功返回后、下一次模型处理前", "", True, "set_state", "thinking"),
     _ce("PostToolUseFailure", "工具失败后", "单次工具失败返回后", "", True, "set_state", "alert"),
     _ce("PostToolBatch", "并行工具批结束", "一批并行工具结束后、下一次模型调用前", "", True, "set_state", "thinking"),
     _ce(

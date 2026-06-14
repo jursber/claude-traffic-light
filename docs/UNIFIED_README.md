@@ -96,8 +96,8 @@ python tests/test_unified.py test
 
 | 状态 | Claude Code（代表性事件） | Codex（代表性事件） | Cursor（代表性事件） |
 |------|--------------------------|----------------------|----------------------|
-| thinking | `UserPromptSubmit` / `PostToolBatch` / `SubagentStart` / `PreCompact` / … | `UserPromptSubmit` / `PostToolUse` / `SubagentStart` / `PreCompact` / … | `beforeSubmitPrompt` / `postToolUse` / `subagentStart` / `preCompact` / … |
-| working | `PreToolUse`(auto) / `PostToolUse` / `SubagentStop` / … | `PreToolUse`(auto) / `SubagentStop` / … | `preToolUse`(auto) / `subagentStop` / … |
+| thinking | `UserPromptSubmit` / `PostToolUse` / `PostToolBatch` / `SubagentStart` / `PreCompact` / … | `UserPromptSubmit` / `PostToolUse` / `SubagentStart` / `PreCompact` / … | `beforeSubmitPrompt` / `postToolUse` / `subagentStart` / `preCompact` / … |
+| working | `PreToolUse`(auto) / `SubagentStop` / … | `PreToolUse`(auto) / `SubagentStop` / … | `preToolUse`(auto) / `subagentStop` / … |
 | alert | `PermissionRequest` / `Notification` / `StopFailure` / `PermissionDenied` / `Elicitation` / … | `PermissionRequest` / `PreToolUse`(auto) / … | `postToolUseFailure` / … |
 | idle | `Stop` / `PostCompact` / `Setup` / … | `Stop` / `PostCompact` / … | `stop` / … |
 | off | `SessionEnd` | `SessionEnd` | `sessionEnd` |

@@ -87,6 +87,9 @@ def test_default_gui_document_uses_v2_priorities_with_thinking_breath() -> None:
     assert claude["UserPromptSubmit"]["effect"] == "breath"
     assert claude["UserPromptSubmit"]["mask"] == MASK_Y
     assert claude["UserPromptSubmit"]["priority"] == 2
+    assert claude["PostToolUse"]["effect"] == "breath"
+    assert claude["PostToolUse"]["mask"] == MASK_Y
+    assert claude["PostToolUse"]["priority"] == 2
     assert codex["PostToolUse"]["effect"] == "breath"
     assert codex["PostToolUse"]["mask"] == MASK_Y
     assert codex["PostToolUse"]["priority"] == 2
