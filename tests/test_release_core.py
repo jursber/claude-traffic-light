@@ -123,6 +123,52 @@ def test_wired_hook_commands_include_event_argument() -> None:
                 assert f"--event {event}" in command
 
 
+def test_claude_post_tool_hook_never_uses_legacy_working_state() -> None:
+    def hook_command(script: str, state: str, *extra: str) -> str:
+        return " ".join([script, state, *extra]).strip()
+
+    def hook_group(command: str, matcher: str = "", timeout: int = 5) -> dict:
+        return {"matcher": matcher, "hooks": [{"command": command, "timeout": timeout}]}
+
+    groups = iter_claude_wired_hook_groups(hook_command, hook_group)
+    commands = [hook["command"] for group in groups["PostToolUse"] for hook in group["hooks"]]
+
+    assert commands
+    assert all(" thinking " in f" {command} " for command in commands)
+    assert not any(" working " in f" {command} " for command in commands)
+
+
+def test_switch_agent_removes_packaged_legacy_traffic_light_hooks() -> None:
+    from claude_tl.switch_agent import remove_traffic_light_hooks
+
+    legacy_state = "work" + "ing"
+    legacy_event = "PostTool" + "Use"
+    legacy_command = (
+        rf"C:\Program Files\VibeLight\VibeLight.exe set-state-unified {legacy_state} --event {legacy_event}"
+    )
+    config = {
+        "hooks": {
+            "PostToolUse": [
+                {
+                    "matcher": "",
+                    "hooks": [
+                        {
+                            "type": "command",
+                            "command": legacy_command,
+                        },
+                        {"type": "command", "command": "echo keep-user-hook"},
+                    ],
+                }
+            ]
+        }
+    }
+
+    remove_traffic_light_hooks(config)
+
+    hooks = config["hooks"]["PostToolUse"][0]["hooks"]
+    assert hooks == [{"type": "command", "command": "echo keep-user-hook"}]
+
+
 def test_codex_hooks_do_not_depend_on_bash_shell() -> None:
     groups = codex_hook_groups()
     for event_groups in groups.values():

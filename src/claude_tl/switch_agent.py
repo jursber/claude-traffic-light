@@ -92,9 +92,12 @@ def is_traffic_light_hook(hook):
     command = str(hook.get("command", "")).replace("\\", "/")
     if "-m claude_tl" in command:
         return True
+    command_l = command.lower()
     for r in hook_roots_normalized():
         if r and r in command:
             return True
+    if any(name in command_l for name in ("vibelight.exe", "vibecodinglight.exe", "claude-traffic-light.exe")):
+        return True
     return any(
         name in command
         for name in (
@@ -103,6 +106,12 @@ def is_traffic_light_hook(hook):
             "set_alert_and_defer.py",
             "start_daemon_unified.py",
             "start_daemon.py",
+            "set-state-unified",
+            "set-state",
+            "set-alert",
+            "start-daemon-unified",
+            "start-daemon",
+            "daemon-unified",
         )
     )
 
