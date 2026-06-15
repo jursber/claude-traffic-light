@@ -626,22 +626,47 @@ def _start_unified_daemon_silent() -> bool:
         return False
 
 
+def _read_daemon_conn_status() -> dict:
+    """读取 daemon 写入的连接状态文件。"""
+    path = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Temp", "cc_tl_conn_status.json")
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, json.JSONDecodeError, ValueError):
+        return {}
+
+
 def _compose_hw_indicator() -> tuple[str, str]:
     """灯控后台 + 传输/硬件；单行尽量短，不换行。"""
     dm = _daemon_process_running()
     mode = transport_mode()
+    conn = _read_daemon_conn_status()
+    hw_connected = conn.get("connected", False)
+    conn_transport = conn.get("transport", "")
+
     if dm:
-        core = "灯控：运行中（后台占串口/BLE 写灯）"
+        if hw_connected:
+            core = "灯控：运行中"
+        else:
+            core = "灯控：运行中（⚠ 硬件断开）"
     else:
         core = "灯控：未运行（可点「启动灯控」，或新开 Agent 会话由 hook 自启）"
+
     if mode == "ble":
         tail = "｜BLE"
-        fg = "#1a6620" if dm else "#555555"
+        if dm and hw_connected:
+            fg = "#1a6620"
+        elif dm:
+            fg = "#cc0000"  # 红色警示：daemon 在但硬件断了
+        else:
+            fg = "#555555"
     else:
         port = find_esp32_port()
         tail = f"｜ESP32：{port}" if port else "｜未检测到 ESP32"
-        if dm and port:
+        if dm and hw_connected:
             fg = "#1a6620"
+        elif dm and not hw_connected:
+            fg = "#cc0000"  # 红色警示：daemon 在但硬件断了
         elif dm:
             fg = "#6a8f00"
         elif port:
@@ -995,6 +1020,11 @@ class TrafficHookLightApp(ttk.Frame):
 
         self._daemon_stopped_for_serial = False
 
+        # BLE 蓝牙连接状态
+        self._ble_link = None  # BleLink 实例（独立测试用）
+        self._ble_status_var = tk.StringVar(value="未连接")
+        self._ble_busy = False
+
         self._autostart = tk.BooleanVar(value=True)
 
         nb = ttk.Notebook(self)
@@ -1257,6 +1287,15 @@ class TrafficHookLightApp(ttk.Frame):
             variable=self._autostart,
             command=self._on_autostart_toggle,
         ).pack(side=LEFT, padx=(16, 4))
+
+        # ── 蓝牙连接行 ──
+        row_ble = ttk.Frame(f)
+        row_ble.pack(fill=X, pady=2)
+        ttk.Label(row_ble, text="蓝牙", font=("TkDefaultFont", 9, "bold")).pack(side=LEFT)
+        ttk.Button(row_ble, text="连接", command=self._ble_connect).pack(side=LEFT, padx=4)
+        ttk.Button(row_ble, text="断开", command=self._ble_disconnect).pack(side=LEFT, padx=2)
+        ttk.Button(row_ble, text="测试", command=self._ble_test).pack(side=LEFT, padx=2)
+        ttk.Label(row_ble, textvariable=self._ble_status_var, foreground="gray").pack(side=LEFT, padx=(12, 0))
 
         path_lf = ttk.LabelFrame(f, text="程序位置", padding=6)
         path_lf.pack(fill=X, pady=(6, 2))
@@ -1583,15 +1622,25 @@ class TrafficHookLightApp(ttk.Frame):
 
         self._daemon_stopped_for_serial = False
         if _daemon_process_running():
-            released = _ensure_daemon_released_for_serial()
-            if not released:
-                messagebox.showwarning(
-                    "串口",
-                    "无法结束灯控后台进程，串口仍可能被占用。\n"
-                    "请在任务管理器中结束「pythonw / python + daemon_unified」相关进程后再试。",
-                )
-                return
-            self._daemon_stopped_for_serial = True
+            # 检查硬件是否已断开：daemon 运行但硬件断开时，串口未被真正占用
+            conn = _read_daemon_conn_status()
+            hw_connected = conn.get("connected", False)
+            if not hw_connected:
+                # 硬件已断开，先停 daemon 再连接（避免 daemon 重连竞争）
+                self._log("硬件已断开，先停止灯控后台再连接串口…")
+                _stop_unified_daemon_silent()
+                time.sleep(0.5)
+                self._daemon_stopped_for_serial = True
+            else:
+                released = _ensure_daemon_released_for_serial()
+                if not released:
+                    messagebox.showwarning(
+                        "串口",
+                        "无法结束灯控后台进程，串口仍可能被占用。\n"
+                        "请在任务管理器中结束「pythonw / python + daemon_unified」相关进程后再试。",
+                    )
+                    return
+                self._daemon_stopped_for_serial = True
 
         last_err: Exception | None = None
         self._ser = None
@@ -1642,6 +1691,88 @@ class TrafficHookLightApp(ttk.Frame):
         self._sync_connection_status_text()
         self._log("已断开串口并已尝试全灭灯；若曾暂停后台，已尝试恢复灯控进程")
         return restarted
+
+    # ── BLE 蓝牙连接 ──────────────────────────────────────
+
+    def _ble_connect(self) -> None:
+        """启动独立 BleLink 连接（不影响 daemon 的串口连接）。"""
+        if self._ble_busy:
+            return
+        if self._ble_link is not None:
+            self._log("蓝牙已连接")
+            return
+        self._ble_busy = True
+        self._ble_status_var.set("扫描中…")
+        self._log("正在扫描蓝牙设备…")
+
+        def worker():
+            err = None
+            try:
+                from claude_tl.tl_transport import BleLink
+                link = BleLink()
+                link.start()
+                link.wait_connected()
+                self._ble_link = link
+            except Exception as e:
+                err = str(e)
+
+            def done():
+                self._ble_busy = False
+                if err:
+                    self._ble_status_var.set("连接失败")
+                    self._log(f"蓝牙连接失败: {err}")
+                    self._ble_link = None
+                else:
+                    self._ble_status_var.set("已连接(VibeLight)")
+                    self._log("蓝牙已连接 VibeLight")
+                try:
+                    self._update_hw_indicator()
+                except (tk.TclError, OSError):
+                    pass
+
+            try:
+                self.after(0, done)
+            except tk.TclError:
+                self._ble_busy = False
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _ble_disconnect(self) -> None:
+        """断开独立 BLE 连接。"""
+        if self._ble_link is not None:
+            try:
+                self._ble_link.close()
+            except Exception:
+                pass
+            self._ble_link = None
+        self._ble_status_var.set("未连接")
+        self._log("蓝牙已断开")
+        try:
+            self._update_hw_indicator()
+        except (tk.TclError, OSError):
+            pass
+
+    def _ble_test(self) -> None:
+        """通过独立 BLE 连接发送测试帧（三色同步闪烁 2 秒后恢复）。"""
+        if self._ble_link is None or not self._ble_link._connected.is_set():
+            messagebox.showwarning("蓝牙测试", "请先点击「连接」建立蓝牙连接")
+            return
+        from claude_tl.vibelight.protocol import build_set_lighting_frame, MODE_SYNC_BLINK, MASK_G, MASK_Y, MASK_R
+        frame = build_set_lighting_frame(MODE_SYNC_BLINK, MASK_G | MASK_Y | MASK_R, 500, 255, 255, 255)
+        ok = self._ble_link.send_raw(frame)
+        if ok:
+            self._log("蓝牙测试帧已发送（三色同步闪烁）")
+        else:
+            self._log("蓝牙测试帧发送失败")
+            messagebox.showerror("蓝牙测试", "发送失败，蓝牙可能已断开")
+
+    def _update_hw_indicator(self) -> None:
+        """刷新硬件状态指示器。"""
+        try:
+            txt, fg = _compose_hw_indicator()
+            self._hw_indicator.config(text=txt, foreground=fg)
+        except (tk.TclError, OSError):
+            pass
 
     def _parse_nonneg_int(self, s: str, default: int) -> int:
         try:

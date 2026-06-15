@@ -109,20 +109,27 @@ class BleLink:
             log.error(self._import_error)
             return
 
+        backoff = 2  # 初始重连间隔（秒）
+        BACKOFF_MAX = 30  # 最大退避间隔
+        BACKOFF_FACTOR = 2  # 退避倍数
+
         while not self._stop.is_set():
             try:
                 device = await BleakScanner.find_device_by_name(self._name, timeout=20.0)
                 if device is None:
-                    log.info("BLE 扫描未找到设备名 %s，2s 后重试", self._name)
-                    await asyncio.sleep(2)
+                    log.info("BLE 扫描未找到设备名 %s，%ds 后重试", self._name, backoff)
+                    await asyncio.sleep(backoff)
+                    backoff = min(backoff * BACKOFF_FACTOR, BACKOFF_MAX)
                     continue
 
                 async with BleakClient(device, timeout=30.0) as client:
                     if not client.is_connected:
-                        await asyncio.sleep(2)
+                        await asyncio.sleep(backoff)
+                        backoff = min(backoff * BACKOFF_FACTOR, BACKOFF_MAX)
                         continue
                     self._drain_queue()
                     self._connected.set()
+                    backoff = 2  # 连接成功，重置退避
                     log.info("BLE 已连接: %s (%s)", self._name, device.address)
 
                     loop = asyncio.get_event_loop()
@@ -149,7 +156,9 @@ class BleLink:
                 self._drain_queue()
 
             if not self._stop.is_set():
-                await asyncio.sleep(2)
+                log.info("BLE 断开，%ds 后重连…", backoff)
+                await asyncio.sleep(backoff)
+                backoff = min(backoff * BACKOFF_FACTOR, BACKOFF_MAX)
 
     def _blocking_get_cmd(self) -> Optional[bytes]:
         try:

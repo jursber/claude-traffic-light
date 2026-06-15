@@ -31,7 +31,7 @@ from claude_tl.light_effects import (
     config_path as effects_config_path,
 )
 from claude_tl.proc_util import pid_alive
-from claude_tl.tl_transport import transport_mode, wait_for_transport
+from claude_tl.tl_transport import find_esp32_port, transport_mode, wait_for_transport
 
 # ============================================================
 # 日志配置
@@ -72,6 +72,28 @@ LOCK_FILE = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Temp", "cc_traffic
 
 # 配置文件（仓库根或 CC_TL_HOME）
 CONFIG_FILE = str(active_agent_path())
+
+# 连接状态文件（供 GUI 读取硬件连接状态）
+CONN_STATUS_FILE = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Temp", "cc_tl_conn_status.json")
+
+
+def write_conn_status(connected: bool, transport: str = "", port: str = "") -> None:
+    """原子写入连接状态文件，供 GUI 轮询硬件是否在线。"""
+    data = {"connected": connected, "transport": transport, "ts": time.time()}
+    if port:
+        data["port"] = port
+    tmp = CONN_STATUS_FILE + ".tmp"
+    try:
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+            f.flush()
+            try:
+                os.fsync(f.fileno())
+            except OSError:
+                pass
+        os.replace(tmp, CONN_STATUS_FILE)
+    except OSError:
+        pass
 
 
 def load_config():
@@ -420,8 +442,12 @@ def main():
 
     log.info("守护进程启动, PID=%d", os.getpid())
 
-    # 注册退出日志
-    atexit.register(lambda: log.warning("守护进程退出, PID=%d", os.getpid()))
+    # 注册退出日志与状态清理
+    def _on_exit():
+        log.warning("守护进程退出, PID=%d", os.getpid())
+        write_conn_status(False, "stopped")
+
+    atexit.register(_on_exit)
 
     # 确保状态目录存在
     state_dir = get_state_dir()
@@ -430,13 +456,18 @@ def main():
     while True:
         link = None
         try:
+            mode = transport_mode()
+            write_conn_status(False, mode)
             link = wait_for_transport(RECONNECT_INTERVAL)
-            log.info("硬件已连接 (transport=%s)", transport_mode())
+            port = find_esp32_port() if mode == "serial" else ""
+            write_conn_status(True, mode, port or "")
+            log.info("硬件已连接 (transport=%s)", mode)
 
             run_once(link)
 
         except ConnectionError:
             log.warning("硬件断开，等待重连...")
+            write_conn_status(False, transport_mode())
             if link:
                 try:
                     link.close()
@@ -448,6 +479,7 @@ def main():
             raise
         except Exception as e:
             log.error("致命异常 (%s):\n%s", type(e).__name__, traceback.format_exc())
+            write_conn_status(False, transport_mode())
             if link:
                 try:
                     link.close()
