@@ -13,11 +13,30 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import subprocess
 import sys
 
 from claude_tl._paths import repo_root
+
+log = logging.getLogger("launcher")
+
+
+def _is_third_party_python(exe: str) -> bool:
+    """检测是否为第三方工具(如 hermes-agent)的 Python，不应被本项目使用。"""
+    lower = exe.lower().replace("\\", "/")
+    return "hermes" in lower or "codex" in lower
+
+
+def _find_project_venv_python() -> str:
+    """在仓库根目录查找 .venv/Scripts/python.exe，找到则返回绝对路径。"""
+    root = repo_root()
+    for candidate in (".venv/Scripts/python.exe", "venv/Scripts/python.exe"):
+        p = os.path.join(root, candidate)
+        if os.path.isfile(p):
+            return p
+    return ""
 
 # 仓库根目录薄封装脚本名(开发模式) → 统一子命令(__main__.py 与打包入口都认)
 SCRIPT_TO_SUBCOMMAND: dict[str, str] = {
@@ -43,8 +62,32 @@ def is_frozen() -> bool:
 
 
 def python_executable() -> str:
-    """开发模式下用于跑脚本的解释器；允许用 CC_TL_PYTHON 覆盖。"""
-    return os.environ.get("CC_TL_PYTHON") or sys.executable
+    """开发模式下用于跑脚本的解释器。
+
+    优先级：CC_TL_PYTHON > 项目 .venv > sys.executable。
+    若 sys.executable 指向第三方工具(hermes-agent 等)且无 CC_TL_PYTHON，
+    自动回退到仓库根 .venv；找不到才用 sys.executable 并警告。
+    """
+    env_override = os.environ.get("CC_TL_PYTHON")
+    if env_override:
+        return env_override
+
+    # 检查 sys.executable 是否为第三方工具的 Python
+    if _is_third_party_python(sys.executable):
+        venv = _find_project_venv_python()
+        if venv:
+            log.info(
+                "检测到 sys.executable 为第三方环境 (%s)，自动使用项目 venv: %s",
+                sys.executable, venv,
+            )
+            return venv
+        log.warning(
+            "sys.executable 为第三方环境 (%s) 且未找到项目 .venv，"
+            "请安装: python -m venv .venv && pip install -r requirements.txt",
+            sys.executable,
+        )
+
+    return sys.executable
 
 
 def _dev_root() -> str:

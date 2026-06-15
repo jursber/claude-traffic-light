@@ -257,7 +257,6 @@ def default_tl_hook_light_gui_document() -> dict[str, Any]:
             "duty_r": 255,
             "blink_period_ms": 800,
             "breath_period_ms": 3000,
-            "test_mode": False,
             "boot_autostart_daemon": True,
         },
         "claude": {"rows": [default_hook_gui_row(e) for e in CLAUDE_HOOK_CATALOG]},

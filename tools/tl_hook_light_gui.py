@@ -971,7 +971,6 @@ class TrafficHookLightApp(ttk.Frame):
         super().__init__(master, padding=6)
         self.pack(fill=BOTH, expand=True)
         self._ser: serial.Serial | None = None
-        self._test_mode = tk.BooleanVar(value=False)
 
         self._duty_g = tk.IntVar(value=255)
         self._duty_y = tk.IntVar(value=255)
@@ -979,12 +978,10 @@ class TrafficHookLightApp(ttk.Frame):
         self._blink_period = tk.StringVar(value="800")
         self._breath_period = tk.StringVar(value="2000")
 
-        self._test_g = tk.BooleanVar(value=False)
-        self._test_y = tk.BooleanVar(value=False)
+        self._test_g = tk.BooleanVar(value=True)
+        self._test_y = tk.BooleanVar(value=True)
         self._test_r = tk.BooleanVar(value=True)
         self._test_mode_radio = tk.StringVar(value="BLINK")
-
-        self._test_disable_children: list[tk.Widget] = []
 
         self._agent_busy = False
         self._daemon_start_busy = False
@@ -997,7 +994,6 @@ class TrafficHookLightApp(ttk.Frame):
         self._status = ttk.Label(self, text="就绪", foreground="gray")
 
         self._daemon_stopped_for_serial = False
-        self._test_mode_prev = False
 
         self._autostart = tk.BooleanVar(value=True)
 
@@ -1319,21 +1315,8 @@ class TrafficHookLightApp(ttk.Frame):
 
         r2 = ttk.Frame(test_lf)
         r2.pack(fill=X)
-        self._cb_test_mode = tk.Checkbutton(
-            r2,
-            text="测试模式",
-            variable=self._test_mode,
-            command=self._on_test_mode_toggle,
-            indicatoron=0,
-            width=10,
-            padx=4,
-            pady=2,
-        )
-        self._cb_test_mode.pack(side=LEFT, padx=(0, 12))
         for txt, var in (("绿", self._test_g), ("黄", self._test_y), ("红", self._test_r)):
-            cb = ttk.Checkbutton(r2, text=txt, variable=var)
-            cb.pack(side=LEFT, padx=4)
-            self._test_disable_children.append(cb)
+            ttk.Checkbutton(r2, text=txt, variable=var).pack(side=LEFT, padx=4)
         ttk.Label(r2, text="模式").pack(side=LEFT, padx=(12, 2))
         for val, lab in (
             ("OFF", "全灭"),
@@ -1341,12 +1324,8 @@ class TrafficHookLightApp(ttk.Frame):
             ("BLINK", "同步闪烁"),
             ("BREATH", "呼吸"),
         ):
-            rb = ttk.Radiobutton(r2, text=lab, variable=self._test_mode_radio, value=val)
-            rb.pack(side=LEFT, padx=2)
-            self._test_disable_children.append(rb)
-        self._btn_test_send = ttk.Button(r2, text="发送", command=self._test_send)
-        self._btn_test_send.pack(side=LEFT, padx=10)
-        self._test_disable_children.append(self._btn_test_send)
+            ttk.Radiobutton(r2, text=lab, variable=self._test_mode_radio, value=val).pack(side=LEFT, padx=2)
+        ttk.Button(r2, text="发送", command=self._test_send).pack(side=LEFT, padx=10)
 
         r3 = ttk.LabelFrame(f, text="亮度与周期（扩展帧；与后续 hook 驱动共用数值）", padding=6)
         r3.pack(fill=X, pady=4, before=path_lf)
@@ -1404,7 +1383,7 @@ class TrafficHookLightApp(ttk.Frame):
         lf_foot.pack(fill=BOTH, expand=False, pady=(10, 0))
         foot_box = tk.Text(
             lf_foot,
-            height=3,
+            height=5,
             wrap="word",
             font=("Microsoft YaHei UI", 10) if sys.platform == "win32" else ("TkDefaultFont", 10),
             relief="flat",
@@ -1418,28 +1397,6 @@ class TrafficHookLightApp(ttk.Frame):
         foot_box.insert("1.0", usage_text)
         foot_box.configure(state=tk.DISABLED)
 
-        self._apply_test_region_state()
-
-    def _on_test_mode_toggle(self) -> None:
-        new = bool(self._test_mode.get())
-        if not new and self._test_mode_prev:
-            restarted = False
-            if self._ser is not None and getattr(self._ser, "is_open", False):
-                restarted = bool(self._serial_disconnect())
-            elif self._daemon_stopped_for_serial:
-                _start_unified_daemon_silent()
-                self._daemon_stopped_for_serial = False
-                restarted = True
-            if restarted:
-                messagebox.showinfo(
-                    "试灯",
-                    "已重新启动灯控后台进程（无控制台窗口）。\n"
-                    "硬件仍由 Agent hooks 写状态驱动，一般无需重启 Agent。",
-                )
-        self._test_mode_prev = new
-        if new:
-            self._log("试灯：点「连接」独占串口时会暂停后台守护；「断开」会熄灯并恢复后台。")
-        self._apply_test_region_state()
 
     def _sync_connection_status_text(self) -> None:
         try:
@@ -1686,20 +1643,6 @@ class TrafficHookLightApp(ttk.Frame):
         self._log("已断开串口并已尝试全灭灯；若曾暂停后台，已尝试恢复灯控进程")
         return restarted
 
-    def _apply_test_region_state(self) -> None:
-        on = self._test_mode.get()
-        for w in self._test_disable_children:
-            try:
-                if on:
-                    w.state(["!disabled"])  # type: ignore[attr-defined]
-                else:
-                    w.state(["disabled"])  # type: ignore[attr-defined]
-            except (tk.TclError, AttributeError):
-                try:
-                    w.configure(state=tk.NORMAL if on else tk.DISABLED)
-                except tk.TclError:
-                    pass
-
     def _parse_nonneg_int(self, s: str, default: int) -> int:
         try:
             v = int(str(s).strip())
@@ -1708,9 +1651,6 @@ class TrafficHookLightApp(ttk.Frame):
             return default
 
     def _test_send(self) -> None:
-        if not self._test_mode.get():
-            messagebox.showwarning("测试", "请先开启「测试模式」")
-            return
         mode_map = {"OFF": MODE_OFF, "SOLID": MODE_SOLID, "BLINK": MODE_SYNC_BLINK, "BREATH": MODE_BREATH}
         m = mode_map.get(self._test_mode_radio.get(), MODE_OFF)
         mask = (
@@ -1765,7 +1705,6 @@ class TrafficHookLightApp(ttk.Frame):
             "duty_r": int(self._duty_r.get()),
             "blink_period_ms": self._parse_nonneg_int(self._blink_period.get(), 800),
             "breath_period_ms": self._parse_nonneg_int(self._breath_period.get(), 2000),
-            "test_mode": bool(self._test_mode.get()),
             "boot_autostart_daemon": bool(self._autostart.get()),
             "agent_paths": {agent: self._agent_path_vars[agent].get().strip() for agent in AGENT_ORDER},
         }
@@ -1816,8 +1755,6 @@ class TrafficHookLightApp(ttk.Frame):
         self._duty_r.set(int(b.get("duty_r", 255)))
         self._blink_period.set(str(int(b.get("blink_period_ms", 800))))
         self._breath_period.set(str(int(b.get("breath_period_ms", 2000))))
-        if "test_mode" in b:
-            self._test_mode.set(bool(b["test_mode"]))
         agent_paths = b.get("agent_paths") or {}
         if isinstance(agent_paths, dict):
             for agent in AGENT_ORDER:
@@ -1841,8 +1778,6 @@ class TrafficHookLightApp(ttk.Frame):
                 self._log("已将开机启动从 .bat 升级为无窗口 .vbs（避免登录时闪控制台）")
             except OSError:
                 pass
-        self._apply_test_region_state()
-        self._test_mode_prev = bool(self._test_mode.get())
         self._claude_panel.apply_rows((doc.get("claude") or {}).get("rows"))
         self._codex_panel.apply_rows((doc.get("codex") or {}).get("rows"))
         self._cursor_panel.apply_rows((doc.get("cursor") or {}).get("rows"))
